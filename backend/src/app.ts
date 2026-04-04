@@ -1,11 +1,14 @@
 import "dotenv/config";
 import express from "express";
+import { connectMySQL } from "./config/db";
 
 export const startServer = async () => {
   try {
     const app = express();
 
     app.use(express.json());
+
+    await connectMySQL();
 
     app.get("/api", (req, res) => {
       res.send("API is working 🚀");
