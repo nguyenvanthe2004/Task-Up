@@ -58,30 +58,6 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleGithubLogin = async (code: string) => {
-    try {
-      const res = await callLoginGithub(code);
-
-      dispatch(setCurrentUser(res.data.user));
-      toastSuccess("Login with GitHub successfully");
-
-      window.history.replaceState({}, document.title, "/login");
-
-      navigate("/");
-    } catch (error: any) {
-      toastError(error.message);
-    }
-  };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-
-    if (code) {
-      handleGithubLogin(code);
-    }
-  }, []);
-
   return (
     <div className="w-full max-w-[600px] flex flex-col items-center justify-center p-8 bg-white rounded-lg shadow-lg z-10">
       <div
@@ -143,7 +119,7 @@ const LoginForm: React.FC = () => {
                   return;
                 }
 
-                window.location.href = `https://github.com/login/oauth/authorize?client_id=${YOUR_GITHUB_CLIENT_ID}&redirect_uri=http://localhost:5173/login&scope=user:email`;
+                window.location.href = `https://github.com/login/oauth/authorize?client_id=${YOUR_GITHUB_CLIENT_ID}&redirect_uri=http://localhost:5173/oauth/github&scope=user:email`;
               }}
               className="h-[41px] rounded-3xl border border-gray-300 flex items-center justify-center gap-2 hover:bg-blue-50 transition"
             >
