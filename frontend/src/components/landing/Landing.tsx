@@ -1,7 +1,10 @@
 import { ArrowRight, CircleCheck, CirclePlay } from "lucide-react";
 import type React from "react";
+import { useNavigate } from "react-router-dom";
 
 const Landing: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="pt-14 font-sans antialiased">
       {/* ── HERO ── */}
@@ -40,6 +43,7 @@ const Landing: React.FC = () => {
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
           <button
+            onClick={() => navigate("/login")}
             className="group relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 text-white
                              px-9 py-4 rounded-xl font-bold text-base shadow-lg shadow-indigo-500/25
                              transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/30
@@ -266,6 +270,7 @@ const Landing: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
+                onClick={() => navigate("/login")}
                 className="group relative overflow-hidden bg-indigo-600 hover:bg-indigo-500 text-white
                                  px-10 py-4 rounded-xl font-bold text-base shadow-lg shadow-indigo-900/40
                                  transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
