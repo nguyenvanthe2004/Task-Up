@@ -1,7 +1,9 @@
 import { Bell, MessageCircleQuestionMark, Settings } from "lucide-react";
 import type React from "react";
+import { useNavigate } from "react-router-dom";
 
 const Header: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <header className="flex justify-between items-center w-full mg-0 px-6 h-14 fixed top-0 left-0 z-50 bg-white border-b border-slate-100 shadow-sm">
       <div className="flex items-center gap-8">
@@ -47,7 +49,7 @@ const Header: React.FC = () => {
             <Settings />
           </span>
         </div>
-        <button className="bg-primary hover:bg-primary-dark text-white px-4 py-1.5 rounded text-sm font-semibold transition-all active:scale-95">
+        <button onClick={() => navigate("/login")} className="bg-primary hover:bg-primary-dark text-white px-4 py-1.5 rounded text-sm font-semibold transition-all active:scale-95">
           Get Started
         </button>
       </div>

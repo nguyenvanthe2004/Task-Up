@@ -1,17 +1,60 @@
+import "reflect-metadata";
 import "dotenv/config";
 import express from "express";
-import { connectMySQL } from "./config/db";
+import { Action, useContainer, useExpressServer } from "routing-controllers";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import { UserController } from "./controllers/UserController";
+import { mongooseSerializer } from "./interceptors/serialize.interceptor";
+import { ErrorHandler } from "./middlewares/errorHandler";
+import {
+  AuthMiddleware,
+  authorizationChecker,
+} from "./middlewares/authMiddlewares";
+
+import sequelize from "./config/db";
+import Container from "typedi";
+
+dotenv.config();
+
+useContainer(Container);
 
 export const startServer = async () => {
   try {
     const app = express();
 
-    app.use(express.json());
+    app.use(cookieParser());
 
-    await connectMySQL();
+    await sequelize.authenticate();
+    console.log("MySQL connected");
 
-    app.get("/api", (req, res) => {
-      res.send("API is working 🚀");
+    await sequelize.sync();
+
+    app.use(mongooseSerializer);
+
+    useExpressServer(app, {
+
+      controllers: [UserController],
+
+      middlewares: [ErrorHandler, AuthMiddleware],
+
+      authorizationChecker: authorizationChecker,
+      currentUserChecker: async (action: Action) => {
+        const req = action.request;
+        return (req as any).user;
+      },
+      cors: {
+        origin: process.env.FRONTEND_URL,
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+      },
+      validation: {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      },
+      routePrefix: "/api",
+      defaultErrorHandler: false,
     });
 
     const port = process.env.PORT || 4000;
@@ -20,6 +63,6 @@ export const startServer = async () => {
       console.log(`🚀 Server running at http://localhost:${port}`);
     });
   } catch (error) {
-    console.error("Error starting server:", error);
+    console.error("❌ Error starting server:", error);
   }
 };
