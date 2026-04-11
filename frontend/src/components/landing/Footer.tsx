@@ -1,3 +1,4 @@
+import { AtSign, Earth, Users } from "lucide-react";
 import type React from "react";
 
 const Footer: React.FC = () => {
@@ -25,19 +26,19 @@ const Footer: React.FC = () => {
               className="text-on-surface-variant hover:text-primary transition-colors"
               href="#"
             >
-              <span className="material-symbols-outlined">alternate_email</span>
+              <span className="material-symbols-outlined"><AtSign /></span>
             </a>
             <a
               className="text-on-surface-variant hover:text-primary transition-colors"
               href="#"
             >
-              <span className="material-symbols-outlined">public</span>
+              <span className="material-symbols-outlined"><Earth /></span>
             </a>
             <a
               className="text-on-surface-variant hover:text-primary transition-colors"
               href="#"
             >
-              <span className="material-symbols-outlined">group</span>
+              <span className="material-symbols-outlined"><Users /></span>
             </a>
           </div>
         </div>

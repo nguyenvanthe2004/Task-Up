@@ -28,14 +28,13 @@ export class UserRepository {
     return await User.findOne({ where: { verifyCode: code } });
   }
 
-  async create(data: CreateUserInput, options?: any) {
-    return await User.create(data, options);
+  async create(data: CreateUserInput) {
+    return await User.create(data);
   }
 
-  async update(id: string, data: any, options?: any) {
+  async update(id: string, data: any) {
     await User.update(data, {
-      where: { id },
-      ...options,
+      where: { id }
     });
 
     return await User.findByPk(id);

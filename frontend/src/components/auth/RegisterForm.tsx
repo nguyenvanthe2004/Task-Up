@@ -86,7 +86,7 @@ export default function Register() {
 
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login successfully");
-      navigate("/");
+      navigate("/home");
     } catch (error: any) {
       toastError(error.message);
     }

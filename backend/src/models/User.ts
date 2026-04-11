@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import sequelize from "../config/db"; // file connect MySQL
+import sequelize from "../config/db";
 
 export enum UserRole {
   USER = "user",
