@@ -15,7 +15,7 @@ const GithubCallback = () => {
 
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login with GitHub successfully");
-      navigate("/");
+      navigate("/home");
     } catch (error: any) {
       navigate("/login");
       toastError(error.message);

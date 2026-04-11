@@ -7,6 +7,13 @@ import { callGetCurrentUser } from "./services/auth";
 import { setCurrentUser } from "./redux/slices/currentUser";
 import { useDispatch } from "react-redux";
 import GithubCallback from "./components/auth/GitHubCallBack";
+import HomePage from "./pages/home/HomePage";
+import MyTaskPage from "./pages/tasks/MyTaskPage";
+import MySpacePage from "./pages/spaces/MySpacePage";
+import ProfilePage from "./pages/profile/ProfilePage";
+import SpaceOverviewPage from "./pages/spaces/SpaceOverviewPage";
+import NotificationPage from "./pages/notifications/NotificationPage";
+import SpaceMemberPage from "./pages/spaces/SpaceMemberPage";
 
 function App() {
   const dispatch = useDispatch();
@@ -27,6 +34,21 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/oauth/github" element={<GithubCallback />} />
+
+        <Route path="/home" element={<HomePage />} />
+
+        <Route path="/my-tasks" element={<MyTaskPage />} />
+
+
+        <Route path="/spaces">
+          <Route index element={<MySpacePage />} />
+          <Route path="overview" element={<SpaceOverviewPage />} />
+          <Route path="members" element={<SpaceMemberPage />} />
+        </Route>
+
+        <Route path="/settings" element={<ProfilePage />} />
+
+        <Route path="/notifications" element={<NotificationPage />} />
       </Routes>
     </BrowserRouter>
   );

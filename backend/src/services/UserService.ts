@@ -105,14 +105,14 @@ export class UserService {
       const name = payload.name || "Google User";
       const avatar = payload.picture || "";
 
-      let user: any = await this.userRepo.findByEmail(email);
+      let user = await this.userRepo.findByEmail(email);
 
       if (!user) {
         user = await this.userRepo.create({
           fullName: name,
           email: email,
           phone: "",
-          password: "GOOGLE LOGIN",
+          password: "",
           role: UserRole.USER,
           avatar: avatar,
           verifyCode: "",
@@ -120,7 +120,7 @@ export class UserService {
         });
       }
 
-      const userId = user._id?.toString();
+      const userId = user.id;
 
       const token = jwt.sign(
         {
@@ -192,14 +192,14 @@ export class UserService {
 
       const { name, avatar_url } = userRes.data;
 
-      let user: any = await this.userRepo.findByEmail(email);
+      let user = await this.userRepo.findByEmail(email);
 
       if (!user) {
         user = await this.userRepo.create({
           fullName: name || "GitHub User",
           email,
           phone: "",
-          password: "GITHUB LOGIN",
+          password: "",
           role: UserRole.USER,
           avatar: avatar_url,
           verifyCode: "",
@@ -207,7 +207,7 @@ export class UserService {
         });
       }
 
-      const userId = user._id?.toString();
+      const userId = user.id;
 
       const token = jwt.sign(
         {
@@ -286,7 +286,6 @@ export class UserService {
           verifyCode,
           isActive: false,
         },
-        { transaction: t },
       );
 
       await t.commit();
