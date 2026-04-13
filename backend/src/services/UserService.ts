@@ -47,7 +47,7 @@ export class UserService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const user = await this.userRepo.findOne(id);
     if (!user) throw new BadRequestError("User not found");
     return user;
@@ -64,10 +64,12 @@ export class UserService {
 
     const token = jwt.sign(
       {
-        userId: user.id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
+        phone: user.phone,
         role: user.role,
+        avatar: user.avatar,
       },
       process.env.JWT_SECRET!,
       { expiresIn: "7d" },
@@ -124,7 +126,7 @@ export class UserService {
 
       const token = jwt.sign(
         {
-          userId: userId,
+          id: userId,
           fullName: user.fullName,
           phone: user.phone,
           email: user.email,
@@ -146,7 +148,7 @@ export class UserService {
 
       return {
         user: {
-          userId: userId,
+          id: userId,
           fullName: user.fullName,
           phone: user.phone,
           email: user.email,
@@ -211,7 +213,7 @@ export class UserService {
 
       const token = jwt.sign(
         {
-          userId: userId,
+          id: userId,
           fullName: user.fullName,
           phone: user.phone,
           email: user.email,
@@ -233,7 +235,7 @@ export class UserService {
 
       return {
         user: {
-          userId: userId,
+          id: userId,
           fullName: user.fullName,
           phone: user.phone,
           email: user.email,
@@ -255,9 +257,9 @@ export class UserService {
       throw new BadRequestError("Invalid verification code");
     }
 
-    await this.userRepo.update(String(user.id), {
+    await this.userRepo.update(user.id, {
       isActive: true,
-      verifyCode: null,
+      verifyCode: undefined,
     });
 
     return { message: "Email verified successfully" };
@@ -275,18 +277,16 @@ export class UserService {
       const hashedPassword = await bcrypt.hash(dto.password, 10);
       const verifyCode = await generateVerifyCode(6, this.userRepo);
 
-      await this.userRepo.create(
-        {
-          fullName: dto.fullName,
-          email: dto.email,
-          password: hashedPassword,
-          phone: "",
-          avatar: "",
-          role: UserRole.USER,
-          verifyCode,
-          isActive: false,
-        },
-      );
+      await this.userRepo.create({
+        fullName: dto.fullName,
+        email: dto.email,
+        password: hashedPassword,
+        phone: "",
+        avatar: "",
+        role: UserRole.USER,
+        verifyCode,
+        isActive: false,
+      });
 
       await t.commit();
 
@@ -300,22 +300,16 @@ export class UserService {
       throw new BadRequestError("Failed to register user");
     }
   }
-
-  async sendForgotPasswordCode(email: string) {
-    const user = await this.userRepo.findByEmail(email);
-    if (!user) throw new BadRequestError("User not found");
-
-    const verifyCode = await generateVerifyCode(6, this.userRepo);
-
-    await this.userRepo.update(String(user.id), { verifyCode });
-
-    await this.mailService.sendVerifyCode(email, verifyCode);
-
-    return { message: "Verification code sent" };
+  async currentUser(user: JwtPayload) {
+    if (!user) {
+      throw new BadRequestError("User not authenticated");
+    }
+    return user;
   }
 
   async updateProfile(data: UpdateProfileDto, user: UserProps, res: Response) {
-    const updated = await this.userRepo.update(user.userId, {
+    console.log(user.id);
+    const updated = await this.userRepo.update(user.id, {
       fullName: data.fullName,
       phone: data.phone,
     });
@@ -327,12 +321,11 @@ export class UserService {
 
   async updateAvatar(user: UserProps, avatar: string, res: Response) {
     try {
-      const userId = String(user.userId);
-      const existedUser = await this.userRepo.findOne(userId);
+      const existedUser = await this.userRepo.findOne(user.id);
       if (!existedUser) {
         throw new BadRequestError("User not found");
       }
-      const updateAvatar = await this.userRepo.update(userId, { avatar });
+      const updateAvatar = await this.userRepo.update(user.id, { avatar });
       refreshToken(res, updateAvatar!);
       return { success: true };
     } catch (error: any) {
@@ -341,7 +334,7 @@ export class UserService {
   }
 
   async updatePassword(user: UserProps, data: UpdatePasswordDto) {
-    const existedUser = await this.userRepo.findOne(user.userId);
+    const existedUser = await this.userRepo.findOne(user.id);
     if (!existedUser) throw new BadRequestError("User not found");
 
     const isMatch = await bcrypt.compare(
@@ -355,7 +348,7 @@ export class UserService {
 
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
 
-    await this.userRepo.update(user.userId, {
+    await this.userRepo.update(user.id, {
       password: hashedPassword,
     });
 

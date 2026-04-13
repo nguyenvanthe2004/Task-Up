@@ -4,7 +4,7 @@ import type { CurrentUserState, User } from "../../types/auth";
 
 const initialState: CurrentUserState = {
   currentUser: {
-    userId: "",
+    id: 0,
     fullName: "",
     email: "",
     phone: "",
@@ -22,7 +22,7 @@ export const currentUserSlice = createSlice({
     },
     logout: (state) => {
       state.currentUser = {
-        userId: "",
+        id: 0,
         fullName: "",
         email: "",
         phone: "",

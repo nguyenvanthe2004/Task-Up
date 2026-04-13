@@ -1,5 +1,5 @@
 import { Service } from "typedi";
-import { CreateUserInput } from "../types/user";
+import { CreateUserInput, UpdateProfileInput } from "../types/user";
 import User from "../models/User";
 
 @Service()
@@ -16,7 +16,7 @@ export class UserRepository {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     return await User.findByPk(id);
   }
 
@@ -32,7 +32,7 @@ export class UserRepository {
     return await User.create(data);
   }
 
-  async update(id: string, data: any) {
+  async update(id: number, data: Partial<User>) {
     await User.update(data, {
       where: { id }
     });

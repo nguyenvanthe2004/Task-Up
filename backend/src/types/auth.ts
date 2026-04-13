@@ -1,7 +1,7 @@
 import { UserRole } from "../models/User";
 
 export interface JwtPayload {
-  userId: string;
+  id: number;
   fullName: string;
   email: string;
   phone: string;
@@ -9,6 +9,6 @@ export interface JwtPayload {
   avatar: string;
 }
 
-export type UserProps = Omit<JwtPayload, "userId"> & {
-  userId: string;
+export type UserProps = Omit<JwtPayload, "id"> & {
+  id: number;
 };
