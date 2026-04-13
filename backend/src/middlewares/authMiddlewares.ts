@@ -62,7 +62,7 @@ export class AuthMiddleware implements ExpressMiddlewareInterface {
 
       // @ts-ignore
       req.user = {
-        userId: decoded.userId,
+        id: decoded.id,
         fullName: decoded.fullName,
         email: decoded.email,
         phone: decoded.phone,

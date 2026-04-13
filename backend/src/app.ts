@@ -14,6 +14,7 @@ import {
 
 import sequelize from "./config/db";
 import Container from "typedi";
+import { FileController } from "./controllers/FileController";
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ export const startServer = async () => {
 
     useExpressServer(app, {
 
-      controllers: [UserController],
+      controllers: [UserController, FileController],
 
       middlewares: [ErrorHandler, AuthMiddleware],
 

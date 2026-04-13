@@ -50,7 +50,7 @@ export class UserController {
 
   @Authorized([UserRole.ADMIN])
   @Get("/:id")
-  async findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: number) {
     return this.userService.findOne(id);
   }
 
@@ -87,11 +87,6 @@ export class UserController {
   @Post("/verify-email")
   async verifyEmail(@Body({ validate: true }) data: VerifyUserDto) {
     return this.userService.verifyEmail(data.email, data.code);
-  }
-  @Public()
-  @Post("/forgot-code")
-  async sendForgotPasswordCode(@Body() body: { email: string }) {
-    return this.userService.sendForgotPasswordCode(body.email);
   }
 
   @Put("/profile")

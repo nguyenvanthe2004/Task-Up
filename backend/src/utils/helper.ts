@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { UserRepository } from "../repositories/UserRepository";
 import { Response } from "express";
-import { IUser } from "../models/User";
+import User from "../models/User";
 
 export async function generateVerifyCode(length = 6, userRepo: UserRepository) {
   const chars = "0123456789";
@@ -19,10 +19,10 @@ export async function generateVerifyCode(length = 6, userRepo: UserRepository) {
   return code;
 }
 
-export const refreshToken = (res: Response, user: IUser) => {
+export const refreshToken = (res: Response, user: User) => {
   const token = jwt.sign(
     {
-      userId: user._id,
+      id: user.id,
       fullName: user.fullName,
       phone: user.phone,
       email: user.email,

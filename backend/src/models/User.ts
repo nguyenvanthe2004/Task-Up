@@ -33,7 +33,7 @@ export class User
   public phone?: string;
   public avatar?: string;
   public role!: UserRole;
-  public verifyCode?: string;
+  public verifyCode!: string;
   public isActive!: boolean;
 
   public readonly createdAt!: Date;
