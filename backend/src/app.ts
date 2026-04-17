@@ -15,6 +15,9 @@ import {
 import sequelize from "./config/db";
 import Container from "typedi";
 import { FileController } from "./controllers/FileController";
+import { WorkspaceController } from "./controllers/WorkspaceController";
+
+import initModels from "./models";
 
 dotenv.config();
 
@@ -26,6 +29,8 @@ export const startServer = async () => {
 
     app.use(cookieParser());
 
+    initModels();
+
     await sequelize.authenticate();
     console.log("MySQL connected");
 
@@ -34,8 +39,7 @@ export const startServer = async () => {
     app.use(mongooseSerializer);
 
     useExpressServer(app, {
-
-      controllers: [UserController, FileController],
+      controllers: [UserController, FileController, WorkspaceController],
 
       middlewares: [ErrorHandler, AuthMiddleware],
 

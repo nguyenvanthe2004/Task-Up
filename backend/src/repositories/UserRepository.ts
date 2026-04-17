@@ -1,5 +1,6 @@
 import { Service } from "typedi";
 import { CreateUserInput, UpdateProfileInput } from "../types/user";
+import Workspace from "../models/Workspace";
 import User from "../models/User";
 
 @Service()
@@ -21,7 +22,17 @@ export class UserRepository {
   }
 
   async findByEmail(email: string) {
-    return await User.findOne({ where: { email } });
+    return await User.findOne({
+      where: { email },
+      include: [
+        {
+          model: Workspace,
+          attributes: ["id", "name", "icon", "color"],
+          through: { attributes: [] },
+          as: "workspaces",
+        },
+      ],
+    });
   }
 
   async findByCode(code: string) {
@@ -34,7 +45,7 @@ export class UserRepository {
 
   async update(id: number, data: Partial<User>) {
     await User.update(data, {
-      where: { id }
+      where: { id },
     });
 
     return await User.findByPk(id);

@@ -1,5 +1,4 @@
 import { UserRole } from "../models/User";
-
 export interface JwtPayload {
   id: number;
   fullName: string;

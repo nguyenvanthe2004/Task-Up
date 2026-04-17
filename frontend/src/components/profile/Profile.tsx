@@ -260,7 +260,7 @@ const Profile: React.FC = () => {
                 <img
                   src={
                     user?.avatar
-                      ? user.avatar.startsWith("http")
+                      ? user.avatar.startsWith("https")
                         ? user.avatar
                         : `${CLOUDINARY_URL}${user.avatar}`
                       : "/images/avatar.png"

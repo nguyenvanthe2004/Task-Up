@@ -8,7 +8,7 @@ import {
   UpdateProfileDto,
 } from "../dtos/UserDto";
 import bcrypt from "bcrypt";
-import { UserRole } from "../models/User";
+import User, { UserRole } from "../models/User";
 import jwt from "jsonwebtoken";
 import { JwtPayload, UserProps } from "../types/auth";
 import { MailService } from "./MailService";
@@ -28,9 +28,6 @@ export class UserService {
 
   async findAll(page = 1, limit = 10) {
     try {
-      page = Math.max(1, Number(page));
-      limit = Math.max(1, Number(limit));
-
       const skip = (page - 1) * limit;
 
       const [users, total] = await Promise.all([
@@ -57,6 +54,8 @@ export class UserService {
     const user = await this.userRepo.findByEmail(dto.email);
     if (!user) throw new BadRequestError("User not found");
 
+    const plainUser = user.get({ plain: true });
+
     const isMatch = await bcrypt.compare(dto.password, user.password);
     if (!isMatch) {
       throw new BadRequestError("Invalid email or password");
@@ -81,7 +80,7 @@ export class UserService {
     });
 
     return {
-      user,
+      user: plainUser,
       token,
       message: "Login successfully!",
     };
@@ -122,6 +121,8 @@ export class UserService {
         });
       }
 
+      const plainUser = user.get({ plain: true });
+
       const userId = user.id;
 
       const token = jwt.sign(
@@ -147,16 +148,9 @@ export class UserService {
       });
 
       return {
-        user: {
-          id: userId,
-          fullName: user.fullName,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar,
-        },
+        user: plainUser,
         token,
-        message: "Login with Google successfully!",
+        message: "Login successfully!",
       };
     } catch (error: any) {
       throw new BadRequestError(error.message);
@@ -208,6 +202,7 @@ export class UserService {
           isActive: true,
         });
       }
+      const plainUser = user.get({ plain: true });
 
       const userId = user.id;
 
@@ -234,16 +229,9 @@ export class UserService {
       });
 
       return {
-        user: {
-          id: userId,
-          fullName: user.fullName,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar,
-        },
+        user: plainUser,
         token,
-        message: "Login with GitHub successfully!",
+        message: "Login successfully!",
       };
     } catch (error: any) {
       throw new BadRequestError(error.message);
@@ -304,7 +292,13 @@ export class UserService {
     if (!user) {
       throw new BadRequestError("User not authenticated");
     }
-    return user;
+    const findUser = await this.userRepo.findByEmail(user.email);
+    if (!findUser) {
+      throw new BadRequestError("User not found");
+    }
+
+    const plainUser = findUser.get({ plain: true });
+    return plainUser;
   }
 
   async updateProfile(data: UpdateProfileDto, user: UserProps, res: Response) {

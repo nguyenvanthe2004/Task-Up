@@ -1,3 +1,5 @@
+import { Workspace } from "./workspace";
+
 export interface RegisterData {
   fullName: string;
   email: string;
@@ -14,6 +16,15 @@ export interface User {
   phone: string;
   role: string;
   avatar: string;
+  UserWorkspace: {
+    role: string;
+    acceptedAt: Date;
+    invitedBy: number;
+    inviter?: {
+      email: string;
+    };
+    workspaces?: Workspace[];
+  };
 }
 
 export interface CurrentUserState {

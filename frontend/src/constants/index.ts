@@ -8,6 +8,11 @@ export enum UserRole {
   ADMIN = "admin",
 }
 
+export enum WorkspaceRole {
+  OWNER = "owner",
+  MEMBER = "member",
+}
+
 export const priorityBadge: Record<string, string> = {
   High: "bg-red-50 text-red-700",
   Medium: "bg-amber-50 text-amber-700",
@@ -35,3 +40,7 @@ export const statusMap: Record<string, { icon: string; text: string; bg: string;
 };
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+
+
+

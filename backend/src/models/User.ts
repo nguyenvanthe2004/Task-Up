@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/db";
+import { Workspace } from "../types/workspace";
 
 export enum UserRole {
   USER = "user",
@@ -18,6 +19,7 @@ interface UserAttributes {
   role: UserRole;
   verifyCode?: string;
   isActive: boolean;
+  Workspaces?: Workspace[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -26,18 +28,19 @@ export class User
   extends Model<UserAttributes, UserCreationAttributes>
   implements UserAttributes
 {
-  public id!: number;
-  public fullName!: string;
-  public email!: string;
-  public password!: string;
-  public phone?: string;
-  public avatar?: string;
-  public role!: UserRole;
-  public verifyCode!: string;
-  public isActive!: boolean;
+  declare id: number;
+  declare fullName: string;
+  declare email: string;
+  declare password: string;
+  declare phone?: string;
+  declare avatar?: string;
+  declare role: UserRole;
+  declare verifyCode: string;
+  declare isActive: boolean;
+  declare readonly Workspaces?: Workspace[];
 
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 }
 
 User.init(

@@ -3,44 +3,44 @@ import { IsEmail, IsNumberString, IsOptional, IsString, MinLength } from "class-
 export class CreateUserDto {
   @IsString()
   @MinLength(2)
-  fullName: string;
+  fullName!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }
 export class VerifyUserDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @MinLength(6)
-  code: string;
+  code!: string;
 }
 export class LoginUserDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }
 export class UpdateProfileDto {
   @IsString()
   @MinLength(2)
-  fullName: string;
+  fullName!: string;
 
   @IsString()
-  phone: string;
+  phone!: string;
 }
 export class UpdatePasswordDto {
   @IsString()
-  oldPassword: string;
+  oldPassword!: string;
 
   @IsString()
   @MinLength(6)
-  newPassword: string;
+  newPassword!: string;
 }

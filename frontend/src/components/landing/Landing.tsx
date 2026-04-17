@@ -1,9 +1,19 @@
 import { ArrowRight, CircleCheck, CirclePlay } from "lucide-react";
 import type React from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const inviteToken = params.get("inviteToken");
+
+ useEffect(() => {
+  if (!inviteToken) return;
+
+  localStorage.setItem("inviteToken", inviteToken);
+}, [inviteToken]);
+
 
   return (
     <div className="pt-14 font-sans antialiased">
