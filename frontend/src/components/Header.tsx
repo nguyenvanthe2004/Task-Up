@@ -1,7 +1,7 @@
 import { Bell, HelpCircle, LogOut, Search, Settings, User } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { RootState } from "../redux/store";
 import { logout } from "../redux/slices/currentUser";
 import { callLogout } from "../services/auth";
@@ -20,6 +20,7 @@ const Header: React.FC = () => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
+  const { workspaceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
@@ -40,14 +41,12 @@ const Header: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Auto-focus mobile search input when opened
   useEffect(() => {
     if (mobileSearchOpen && mobileSearchRef.current) {
       setTimeout(() => mobileSearchRef.current?.focus(), 50);
     }
   }, [mobileSearchOpen]);
 
-  // Close mobile menu when navigating
   useEffect(() => {
     setMobileMenuOpen(false);
     setMobileSearchOpen(false);
@@ -68,10 +67,7 @@ const Header: React.FC = () => {
     <>
       <header className="flex justify-between items-center w-full px-4 sm:px-6 h-14 fixed top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
         {/* Left: Logo */}
-        <div
-          onClick={() => navigate("/home")}
-          className="flex items-center gap-3 cursor-pointer"
-        >
+        <div className="flex items-center gap-3 cursor-pointer">
           <img src="/favicon.svg" alt="logo" className="w-7 h-7" />
           <span className="text-lg font-bold text-slate-900 tracking-tight">
             TaskUp
@@ -107,11 +103,11 @@ const Header: React.FC = () => {
           {/* Icon Actions – hidden on mobile */}
           <div className="hidden md:flex items-center gap-0.5 border-l border-slate-100 ml-1 pl-3">
             {icons.map(({ key, icon: Icon, path }) => {
-              const isActive = location.pathname === path;
+              const isActive = location.pathname === `/${workspaceId}${path}`;
               return (
                 <button
                   key={key}
-                  onClick={() => navigate(path)}
+                  onClick={() => navigate(`/${workspaceId}${path}`)}
                   className={`p-1.5 rounded-lg transition-all ${
                     isActive
                       ? "text-blue-600 bg-blue-50"
@@ -133,7 +129,13 @@ const Header: React.FC = () => {
               <img
                 alt="User Profile"
                 className="w-8 h-8 rounded-full ring-2 ring-indigo-100 cursor-pointer flex-shrink-0 hover:ring-indigo-300 transition-all"
-                src={`${CLOUDINARY_URL}/${user.avatar}`}
+                src={
+                  user?.avatar
+                    ? user.avatar.startsWith("https")
+                      ? user.avatar
+                      : `${CLOUDINARY_URL}${user.avatar}`
+                    : "/images/avatar.png"
+                }
               />
             </button>
 
@@ -146,7 +148,13 @@ const Header: React.FC = () => {
                     <img
                       alt="User Profile"
                       className="w-9 h-9 rounded-full ring-2 ring-indigo-100 flex-shrink-0"
-                      src={`${CLOUDINARY_URL}/${user.avatar}`}
+                      src={
+                        user?.avatar
+                          ? user.avatar.startsWith("https")
+                            ? user.avatar
+                            : `${CLOUDINARY_URL}${user.avatar}`
+                          : "/images/avatar.png"
+                      }
                     />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">
@@ -228,7 +236,13 @@ const Header: React.FC = () => {
                   <img
                     alt="User Profile"
                     className="w-9 h-9 rounded-full ring-2 ring-indigo-100 flex-shrink-0"
-                    src={`${CLOUDINARY_URL}/${user.avatar}`}
+                    src={
+                      user?.avatar
+                        ? user.avatar.startsWith("http")
+                          ? user.avatar
+                          : `${CLOUDINARY_URL}${user.avatar}`
+                        : "/images/avatar.png"
+                    }
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900 truncate">
@@ -252,11 +266,12 @@ const Header: React.FC = () => {
               <div className="border-t border-slate-100 pt-3 mt-3 flex items-center justify-between px-1">
                 <div className="flex items-center gap-1">
                   {icons.map(({ key, icon: Icon, path }) => {
-                    const isActive = location.pathname === path;
+                    const isActive =
+                      location.pathname === `/${workspaceId}${path}`;
                     return (
                       <button
                         key={key}
-                        onClick={() => navigate(path)}
+                        onClick={() => navigate(`/${workspaceId}${path}`)}
                         className={`p-2 rounded-lg transition-colors ${
                           isActive
                             ? "text-blue-600 bg-blue-50"

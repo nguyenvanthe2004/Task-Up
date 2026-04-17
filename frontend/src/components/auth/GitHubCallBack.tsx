@@ -4,18 +4,27 @@ import { callLoginGithub } from "../../services/auth";
 import { useDispatch } from "react-redux";
 import { setCurrentUser } from "../../redux/slices/currentUser";
 import { toastError, toastSuccess } from "../../lib/toast";
+import { Workspace } from "../../types/workspace";
 
 const GithubCallback = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   const handleLoginGithub = async (code: string) => {
     try {
       const res = await callLoginGithub(code);
+      const userWorkspaces = res.data.user.workspaces;
+
+      setWorkspaces(userWorkspaces);
 
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login with GitHub successfully");
-      navigate("/home");
+      if (userWorkspaces.length > 0) {
+        navigate(`/${userWorkspaces[0].id}`);
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       navigate("/login");
       toastError(error.message);

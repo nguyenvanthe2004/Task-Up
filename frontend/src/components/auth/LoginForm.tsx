@@ -5,21 +5,20 @@ import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { LoginFormData, loginSchema } from "../../validations/auth";
-import {
-  callLogin,
-  callLoginGithub,
-  callLoginGoogle,
-} from "../../services/auth";
+import { callLogin, callLoginGoogle } from "../../services/auth";
 import { setCurrentUser } from "../../redux/slices/currentUser";
 import { toastError, toastSuccess } from "../../lib/toast";
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
 import { YOUR_GITHUB_CLIENT_ID } from "../../constants";
 import { Eye, EyeOff } from "lucide-react";
+import { Workspace } from "../../types/workspace";
+import { callAcceptInvite } from "../../services/workspace";
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [showPassword, setShowPassword] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   const {
     register,
@@ -30,30 +29,62 @@ const LoginForm: React.FC = () => {
     mode: "onChange",
   });
 
+  const handleInvite = async (navigate: ReturnType<typeof useNavigate>) => {
+    const inviteToken = localStorage.getItem("inviteToken");
+    if (!inviteToken) return false;
+
+    try {
+      const { data } = await callAcceptInvite(inviteToken);
+      localStorage.removeItem("inviteToken");
+      navigate(`/${data.workspaceId}`);
+    } catch (error: any) {
+      toastError(error.message);
+      localStorage.removeItem("inviteToken");
+    }
+    return true;
+  };
+
   const onSubmit = async (dto: LoginFormData) => {
     try {
       const { data } = await callLogin(dto);
       dispatch(setCurrentUser(data.user));
       toastSuccess("Login successfully");
-      navigate("/home");
+
+      const redirected = await handleInvite(navigate);
+      if (redirected) return;
+
+      const userWorkspaces = data.user.workspaces;
+      if (userWorkspaces.length > 0) {
+        navigate(`/${userWorkspaces[0].id}`);
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       toastError(error.message);
     }
   };
 
+  // Tương tự cho handleGoogleSuccess
   const handleGoogleSuccess = async (
     credentialResponse: CredentialResponse,
   ) => {
     try {
-      if (!credentialResponse.credential) {
+      if (!credentialResponse.credential)
         throw new Error("No credential from Google");
-      }
 
       const res = await callLoginGoogle(credentialResponse.credential);
-
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login successfully");
-      navigate("/home");
+
+      const redirected = await handleInvite(navigate);
+      if (redirected) return;
+
+      const userWorkspaces = res.data.user.workspaces;
+      if (userWorkspaces.length > 0) {
+        navigate(`/${userWorkspaces[0].id}`);
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       toastError(error.message);
     }
@@ -195,11 +226,7 @@ const LoginForm: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  {showPassword ? (
-                    <Eye />
-                  ) : (
-                    <EyeOff />
-                  )}
+                  {showPassword ? <Eye /> : <EyeOff />}
                 </button>
               </div>
               {errors.password && (

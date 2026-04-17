@@ -34,7 +34,6 @@ export class UserController {
     private readonly uploadService: UploadService,
   ) {}
 
-  @Authorized([UserRole.ADMIN])
   @Get("/")
   findAll(
     @QueryParam("page") page: number,
@@ -44,11 +43,10 @@ export class UserController {
   }
 
   @Get("/current")
-  async getCurrent(@Req() req: Request, @CurrentUser() user: JwtPayload) {
-    return user;
+  async getCurrent(@CurrentUser() user: JwtPayload) {
+    return this.userService.currentUser(user);
   }
 
-  @Authorized([UserRole.ADMIN])
   @Get("/:id")
   async findOne(@Param("id") id: number) {
     return this.userService.findOne(id);

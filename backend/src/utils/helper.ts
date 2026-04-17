@@ -19,6 +19,30 @@ export async function generateVerifyCode(length = 6, userRepo: UserRepository) {
   return code;
 }
 
+const INVITE_SECRET = process.env.INVITE_SECRET!;
+
+export const generateInviteToken = (payload: {
+  workspaceId: number;
+  email: string;
+  invitedBy: number;
+}) => {
+  return jwt.sign(payload, INVITE_SECRET, {
+    expiresIn: "1d",
+  });
+};
+
+export const verifyInviteToken = (token: string) => {
+  try {
+    return jwt.verify(token, INVITE_SECRET) as {
+      workspaceId: number;
+      email: string;
+      invitedBy: number;
+    };
+  } catch {
+    throw new Error("Invalid or expired invite token");
+  }
+};
+
 export const refreshToken = (res: Response, user: User) => {
   const token = jwt.sign(
     {
