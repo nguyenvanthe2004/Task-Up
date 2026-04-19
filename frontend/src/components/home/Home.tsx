@@ -23,12 +23,11 @@ const Home: React.FC = () => {
   const [open, setOpen] = useState(true);
   const navigate = useNavigate();
 
-
-  const fetchWorkspaceOwner = async () => {
+  const fetchWorkspaces = async () => {
     try {
       setLoading(true);
-      const {data} = await callGetMyWorkspace();
-      setWorkspaces(data.data);
+      const { data } = await callGetMyWorkspace();
+      setWorkspaces(data);
     } catch (error: any) {
     } finally {
       setLoading(false);
@@ -36,27 +35,27 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchWorkspaceOwner();
+    fetchWorkspaces();
   }, []);
 
   if (loading) {
     return <LoadingPage />;
   }
-  // if (workspaces.length === 0) {
-  //   return (
-  //     <CreateWorkspaceModal
-  //       isOpen={open}
-  //       onClose={() => {
-  //         if (workspaces.length === 0) return;
-  //         setOpen(false);
-  //       }}
-  //       onSuccess={(newWorkspace) => {
-  //         setWorkspaces((prev) => [...prev, newWorkspace]);
-  //         navigate(`/${newWorkspace.id}`);
-  //       }}
-  //     />
-  //   );
-  // } else {
+  if (workspaces.length === 0) {
+    return (
+      <CreateWorkspaceModal
+        isOpen={open}
+        onClose={() => {
+          if (workspaces.length === 0) return;
+          setOpen(false);
+        }}
+        onSuccess={(newWorkspace) => {
+          setWorkspaces((prev) => [...prev, newWorkspace]);
+          navigate(`/${newWorkspace.id}`);
+        }}
+      />
+    );
+  } else {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="lg:pl-64 pt-10 min-h-screen">
@@ -471,6 +470,6 @@ const Home: React.FC = () => {
       </div>
     );
   }
-// };
+};
 
 export default Home;

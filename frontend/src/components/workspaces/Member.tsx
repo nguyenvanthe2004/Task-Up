@@ -6,20 +6,19 @@ import {
   callRemoveMember,
 } from "../../services/workspace";
 import { toastError, toastSuccess } from "../../lib/toast";
-import { User } from "../../types/auth";
+import { User, UserWithWorkSpace } from "../../types/auth";
 import { CLOUDINARY_URL, WorkspaceRole } from "../../constants";
 import Modal from "../ui/Modal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
 import { Trash } from "lucide-react";
 import { useModal } from "../../hook/useModal";
-import { set } from "zod";
 import { UserWorkspace } from "../../types/workspace";
 
 const Member: React.FC = () => {
-  const [members, setMembers] = useState<User[]>([]);
+  const [members, setMembers] = useState<UserWithWorkSpace[]>([]);
   const [search, setSearch] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<User | null>(null);
+  const [selectedMember, setSelectedMember] = useState<UserWithWorkSpace | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteBy, setInviteBy] = useState("");
@@ -36,7 +35,7 @@ const Member: React.FC = () => {
   const fetchMembers = async () => {
     try {
       const res = await callGetMembers(Number(workspaceId));
-      setInviteBy(res.data.userWorkspaces.find((uw: UserWorkspace) => uw.invitedBy !== null).inviter.email ?? "");
+      setInviteBy(res.data.userWorkspaces.find((uw: UserWorkspace) => uw.invitedBy !== null)?.inviter?.email ?? "");
       setMembers(res.data.users);
     } catch (error: any) {
       toastError(error.message);
@@ -47,8 +46,6 @@ const Member: React.FC = () => {
     if (!workspaceId) return;
     fetchMembers();
   }, [workspaceId]);
-
-  console.log(inviteBy)
 
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !workspaceId) return;

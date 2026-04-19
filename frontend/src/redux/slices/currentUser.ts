@@ -1,6 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { CurrentUserState, User } from "../../types/auth";
+import { Workspace } from "../../types/workspace";
 
 const initialState: CurrentUserState = {
   currentUser: {
@@ -10,6 +11,7 @@ const initialState: CurrentUserState = {
     phone: "",
     role: "",
     avatar: "",
+    workspaces: [],
   },
 };
 
@@ -30,8 +32,16 @@ export const currentUserSlice = createSlice({
         avatar: "",
       };
     },
+    addWorkspace: (state, action: PayloadAction<Workspace>) => {
+      if (state.currentUser) {
+        state.currentUser.workspaces = [
+          ...(state.currentUser.workspaces ?? []),
+          action.payload,
+        ];
+      }
+    },
   },
 });
 
-export const { setCurrentUser, logout } = currentUserSlice.actions;
+export const { setCurrentUser, logout, addWorkspace } = currentUserSlice.actions;
 export default currentUserSlice.reducer;

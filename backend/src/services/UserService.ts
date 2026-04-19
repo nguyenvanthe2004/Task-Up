@@ -79,8 +79,10 @@ export class UserService {
       sameSite: "lax",
     });
 
+    const { password, verifyCode, ...rest } = plainUser;
+
     return {
-      user: plainUser,
+      user: rest,
       token,
       message: "Login successfully!",
     };
@@ -147,8 +149,9 @@ export class UserService {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
+      const { password, verifyCode, ...rest } = plainUser;
       return {
-        user: plainUser,
+        user: rest,
         token,
         message: "Login successfully!",
       };
@@ -228,8 +231,10 @@ export class UserService {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
+      const { password, verifyCode, ...rest } = plainUser;
+
       return {
-        user: plainUser,
+        user: rest,
         token,
         message: "Login successfully!",
       };
@@ -298,7 +303,9 @@ export class UserService {
     }
 
     const plainUser = findUser.get({ plain: true });
-    return plainUser;
+    const { password, verifyCode, ...rest } = plainUser;
+
+    return rest;
   }
 
   async updateProfile(data: UpdateProfileDto, user: UserProps, res: Response) {

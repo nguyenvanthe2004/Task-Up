@@ -21,7 +21,6 @@ export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
 
   @Get("/count/all")
-  @Authorized()
   async countAll() {
     return await this.workspaceService.countAll();
   }

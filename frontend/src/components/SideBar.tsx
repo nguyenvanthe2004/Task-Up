@@ -32,7 +32,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CreateWorkspaceModal from "./workspaces/CreateWorkspaceModal";
 import { Workspace } from "../types/workspace";
-import { callGetMyWorkspace } from "../services/workspace";
+import { RootState } from "../redux/store";
+import { useDispatch, useSelector } from "react-redux";
+import { addWorkspace } from "../redux/slices/currentUser";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Rocket,
@@ -52,23 +54,39 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Docs: BookOpen,
 };
 
+const isEmoji = (str: string) => {
+  const emojiRegex =
+    /[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/u;
+  return emojiRegex.test(str);
+};
+
 interface WorkspaceIconProps {
   icon?: string;
   name?: string;
   className?: string;
+  emojiSize?: number;
 }
 
 const WorkspaceIcon: React.FC<WorkspaceIconProps> = ({
   icon,
   name,
   className = "h-5 w-5",
+  emojiSize = 16,
 }) => {
-  const Icon = icon ? ICON_MAP[icon] : null;
-  return Icon ? (
-    <Icon className={className} strokeWidth={1.75} />
-  ) : (
-    <span className="text-xs font-bold">{name?.charAt(0) ?? "?"}</span>
-  );
+  if (!icon) {
+    return <span className="text-xs font-bold">{name?.charAt(0) ?? "?"}</span>;
+  }
+
+  const Icon = ICON_MAP[icon];
+  if (Icon) {
+    return <Icon className={className} strokeWidth={1.75} />;
+  }
+
+  if (isEmoji(icon) || icon.length <= 2) {
+    return <span style={{ fontSize: emojiSize, lineHeight: 1 }}>{icon}</span>;
+  }
+
+  return <span className="text-xs font-bold">{name?.charAt(0) ?? "?"}</span>;
 };
 
 const menuItems = [
@@ -113,14 +131,13 @@ const SideBar: React.FC = () => {
   const [openSpaces, setOpenSpaces] = useState(false);
   const [openSpacesList, setOpenSpacesList] = useState<number[]>([]);
   const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const dispatch = useDispatch();
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
-  const workspacesRef = useRef<Workspace[]>([]);
+  const userWorkspaces: Workspace[] = user?.workspaces ?? [];
 
-  const workspace =
-    workspacesRef.current.find((w) => w.id === Number(workspaceId)) ??
-    workspaces.find((w) => w.id === Number(workspaceId));
+  const workspace = userWorkspaces.find((w) => w.id === Number(workspaceId));
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -139,30 +156,6 @@ const SideBar: React.FC = () => {
   const isProjectPath = (spaceName: string, catName: string, project: string) =>
     pathname ===
     `/${workspaceId}/spaces/${slug(spaceName)}/${slug(catName)}/${slug(project)}`;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchWorkspacesByUser = async () => {
-      try {
-        setLoading(true);
-        const { data } = await callGetMyWorkspace();
-        if (!cancelled) {
-          workspacesRef.current = data;
-          setWorkspaces(data);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchWorkspacesByUser();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -196,6 +189,14 @@ const SideBar: React.FC = () => {
     setOpenCategories((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
+  };
+
+  const handleSwitchWorkspace = (ws: Workspace) => {
+    navigate(`/${ws.id}`);
+    setOpenDropdown(false);
+    setOpenSpaces(false);
+    setOpenSpacesList([]);
+    setOpenCategories([]);
   };
 
   useEffect(() => {
@@ -384,8 +385,9 @@ const SideBar: React.FC = () => {
               />
               <ChevronDown
                 size={16}
-                onClick={() => {
-                  if (isSpace) setOpenSpaces((prev) => !prev);
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenSpaces((prev) => !prev);
                 }}
                 className={`transition-transform duration-200 ${openSpaces ? "rotate-180" : ""}`}
               />
@@ -424,9 +426,9 @@ const SideBar: React.FC = () => {
           isOpen={open}
           onClose={() => setOpen(false)}
           onSuccess={(newWorkspace) => {
-            workspacesRef.current = [...workspacesRef.current, newWorkspace];
-            setWorkspaces((prev) => [...prev, newWorkspace]);
+            dispatch(addWorkspace(newWorkspace));
             navigate(`/${newWorkspace.id}`);
+            setOpen(false);
           }}
           isLoading={loading}
         />
@@ -440,18 +442,19 @@ const SideBar: React.FC = () => {
           >
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center text-white flex-shrink-0 transition-colors duration-300"
-              style={{ backgroundColor: workspace?.color }}
+              style={{ backgroundColor: workspace?.color ?? "#6366F1" }}
             >
               <WorkspaceIcon
                 icon={workspace?.icon}
                 name={workspace?.name}
                 className="h-5 w-5"
+                emojiSize={18}
               />
             </div>
 
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-900 leading-tight truncate">
-                {workspace?.name}
+                {workspace?.name ?? "Workspace"}
               </p>
               <p className="text-[10.5px] text-slate-400 truncate">
                 {workspace?.description}
@@ -466,6 +469,7 @@ const SideBar: React.FC = () => {
           {/* Dropdown */}
           {openDropdown && (
             <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+              {/* Current workspace info */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
                 <div
                   className="w-9 h-9 rounded-lg flex items-center justify-center text-white flex-shrink-0"
@@ -475,6 +479,7 @@ const SideBar: React.FC = () => {
                     icon={workspace?.icon}
                     name={workspace?.name}
                     className="h-5 w-5"
+                    emojiSize={18}
                   />
                 </div>
                 <div>
@@ -482,20 +487,25 @@ const SideBar: React.FC = () => {
                     {workspace?.name}
                   </p>
                   <p className="text-[10.5px] text-slate-400">
-                    5 members · Enterprise Plan
+                    {userWorkspaces.length} workspaces
                   </p>
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex gap-2 px-3 py-2 border-b border-slate-100">
                 <button
-                  onClick={() => navigate(`/${workspaceId}/members`)}
+                  onClick={() => {
+                    navigate(`/${workspaceId}/members`);
+                    setOpenDropdown(false);
+                  }}
                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   <Users className="w-3.5 h-3.5" /> People
                 </button>
               </div>
 
+              {/* Manage */}
               <div className="pt-2">
                 <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
                   Manage
@@ -523,41 +533,43 @@ const SideBar: React.FC = () => {
 
               <div className="h-px bg-slate-100 my-1" />
 
-              <div className="pt-1">
-                <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                  Switch Workspaces
-                </p>
-                <div className="px-2 pb-2">
-                  {workspaces
-                    .filter((ws) => ws.id !== workspace?.id)
-                    .map((ws) => (
-                      <button
-                        key={ws.id}
-                        onClick={() => {
-                          navigate(`/${ws.id}`);
-                          setOpenDropdown(false);
-                          setOpenSpaces(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
-                      >
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-                          style={{ backgroundColor: ws.color ?? "#6366F1" }}
+              {/* Switch Workspace — lấy từ user.workspaces */}
+              {userWorkspaces.filter((ws) => ws.id !== workspace?.id).length >
+                0 && (
+                <div className="pt-1">
+                  <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                    Switch Workspace
+                  </p>
+                  <div className="px-2 pb-2 max-h-48 overflow-y-auto">
+                    {userWorkspaces
+                      .filter((ws) => ws.id !== workspace?.id)
+                      .map((ws) => (
+                        <button
+                          key={ws.id}
+                          onClick={() => handleSwitchWorkspace(ws)}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
                         >
-                          <WorkspaceIcon
-                            icon={ws.icon}
-                            name={ws.name}
-                            className="h-4 w-4"
-                          />
-                        </div>
-                        <span className="text-sm text-slate-700">
-                          {ws.name}
-                        </span>
-                      </button>
-                    ))}
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                            style={{ backgroundColor: ws.color ?? "#6366F1" }}
+                          >
+                            <WorkspaceIcon
+                              icon={ws.icon}
+                              name={ws.name}
+                              className="h-4 w-4"
+                              emojiSize={14}
+                            />
+                          </div>
+                          <span className="text-sm text-slate-700 truncate">
+                            {ws.name}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
+              {/* Create Workspace */}
               <div className="px-3 pb-3">
                 <button
                   onClick={() => {
@@ -610,7 +622,7 @@ const SideBar: React.FC = () => {
         </div>
       </aside>
 
-      {/* ─── Mobile Sidebar ───────────────────────────────────────────────────── */}
+      {/* ─── Mobile Sidebar ─────────────────────────────────────────────────── */}
       <aside
         className={`lg:hidden flex flex-col h-screen w-60 fixed left-0 top-0 border-r border-slate-200 bg-slate-50 z-50 py-3 transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -624,6 +636,7 @@ const SideBar: React.FC = () => {
             icon={workspace?.icon}
             name={workspace?.name}
             className="h-5 w-5"
+            emojiSize={18}
           />
         </div>
 

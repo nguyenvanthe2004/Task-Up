@@ -15,6 +15,7 @@ export interface UserWorkspace {
   invitedBy: number;
   inviter?: {
     email: string;
+    fullName: string;
   };
   workspaces?: Workspace[];
 }

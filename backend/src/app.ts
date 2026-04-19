@@ -18,6 +18,7 @@ import { FileController } from "./controllers/FileController";
 import { WorkspaceController } from "./controllers/WorkspaceController";
 
 import initModels from "./models";
+import { SpaceController } from "./controllers/SpaceController";
 
 dotenv.config();
 
@@ -39,7 +40,7 @@ export const startServer = async () => {
     app.use(mongooseSerializer);
 
     useExpressServer(app, {
-      controllers: [UserController, FileController, WorkspaceController],
+      controllers: [UserController, FileController, WorkspaceController, SpaceController],
 
       middlewares: [ErrorHandler, AuthMiddleware],
 

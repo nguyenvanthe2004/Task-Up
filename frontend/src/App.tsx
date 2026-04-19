@@ -22,7 +22,6 @@ function App() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const navigate = useNavigate();
   const fetchCurrentUser = async () => {
     try {
       const res = await callGetCurrentUser();
