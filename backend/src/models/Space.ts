@@ -7,6 +7,7 @@ interface SpaceAttributes {
   name: string;
   description: string;
   icon?: string;
+  color?: string;
   workspaceId: number;
   createdAt?: Date;
   updatedAt?: Date;
@@ -22,6 +23,7 @@ export class Space
   declare name: string;
   declare description: string;
   declare icon: string;
+  declare color: string;
   declare workspaceId: number;
   declare readonly Users?: User[];
 
@@ -45,6 +47,10 @@ Space.init(
       allowNull: false,
     },
     icon: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    color: {
       type: DataTypes.STRING,
       allowNull: true,
     },

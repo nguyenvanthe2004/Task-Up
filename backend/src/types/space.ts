@@ -2,12 +2,14 @@ export interface CreateSpaceInput {
   name: string;
   description: string;
   icon?: string;
+  color?: string;
 }
 
 export interface UpdateSpaceInput {
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
   icon?: string;
+  color?: string;
 }
 
 export interface Space {
@@ -15,4 +17,5 @@ export interface Space {
   name: string;
   description: string;
   icon: string;
+  color?: string;
 }
