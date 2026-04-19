@@ -1,4 +1,10 @@
-import { IsString, MinLength, IsOptional, IsBoolean, IsNumber } from "class-validator";
+import {
+  IsString,
+  MinLength,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+} from "class-validator";
 
 export class CreateSpaceDto {
   @IsString()
@@ -12,6 +18,10 @@ export class CreateSpaceDto {
   @IsOptional()
   @IsString()
   icon?: string;
+
+  @IsString()
+  @MinLength(2)
+  color!: string;
 
   @IsNumber()
   workspaceId!: number;
@@ -32,5 +42,8 @@ export class UpdateSpaceDto {
   @IsString()
   icon?: string;
 
-
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  color?: string;
 }

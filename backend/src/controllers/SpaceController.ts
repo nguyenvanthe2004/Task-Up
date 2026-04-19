@@ -11,7 +11,7 @@ import {
 } from "routing-controllers";
 import { Service } from "typedi";
 import { SpaceService } from "../services/SpaceService";
-import { CreateSpaceDto } from "../dtos/SpaceDto";
+import { CreateSpaceDto, UpdateSpaceDto } from "../dtos/SpaceDto";
 import { UserProps } from "../types/auth";
 
 @Service()
@@ -62,7 +62,7 @@ export class SpaceController {
   @Put("/:id")
   async update(
     @Param("id") id: number,
-    @Body({ validate: true }) data: CreateSpaceDto,
+    @Body({ validate: true }) data: UpdateSpaceDto,
     @CurrentUser() user: UserProps,
   ) {
     return await this.spaceService.update(id, data, user);

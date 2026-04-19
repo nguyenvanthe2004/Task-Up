@@ -1,5 +1,5 @@
-import { Loader2, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Save, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -23,6 +23,7 @@ import {
   CreateSpaceFormData,
   CreateSpaceSchema,
 } from "../../validations/space";
+import { callGetSpaceById, callUpdateSpace } from "../../services/space";
 import { toastError, toastSuccess } from "../../lib/toast";
 
 const ICONS = [
@@ -54,37 +55,68 @@ const COLORS = [
   { hex: "#64748B", label: "Slate" },
 ];
 
-interface CreateSpaceModalProps {
+interface UpdateSpaceModalProps {
   isOpen: boolean;
-  isLoading?: boolean;
+  spaceId: number | null;
   onClose: () => void;
-  onSubmit: (data: CreateSpaceFormData) => Promise<void>;
+  onSuccess?: () => void;
 }
 
-export default function CreateSpaceModal({
+export default function UpdateSpaceModal({
   isOpen,
-  isLoading: externalLoading,
+  spaceId,
   onClose,
-  onSubmit,
-}: CreateSpaceModalProps) {
+  onSuccess,
+}: UpdateSpaceModalProps) {
   const [iconIdx, setIconIdx] = useState(0);
   const [selectedColor, setSelectedColor] = useState(COLORS[0].hex);
-  const [internalLoading, setInternalLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const isLoading = externalLoading ?? internalLoading;
+  const isLoading = fetching || saving;
 
   const {
     register,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateSpaceFormData>({
     resolver: zodResolver(CreateSpaceSchema),
     defaultValues: { name: "", description: "" },
   });
+
   const nameValue = watch("name") ?? "";
   const descValue = watch("description") ?? "";
+
+  useEffect(() => {
+    if (!isOpen || !spaceId) return;
+
+    const fetchSpace = async () => {
+      setFetching(true);
+      try {
+        const res = await callGetSpaceById(spaceId);
+        const space = res.data;
+
+        setValue("name", space.name ?? "");
+        setValue("description", space.description ?? "");
+
+        const iconIndex = ICONS.findIndex((i) => i.label === space.icon);
+        setIconIdx(iconIndex >= 0 ? iconIndex : 0);
+
+        const colorMatch = COLORS.find((c) => c.hex === space.color);
+        setSelectedColor(colorMatch ? colorMatch.hex : COLORS[0].hex);
+      } catch (err: any) {
+        toastError(err.message ?? "Failed to load space.");
+        handleClose();
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchSpace();
+  }, [isOpen, spaceId]);
 
   const handleClose = () => {
     if (isLoading) return;
@@ -95,22 +127,22 @@ export default function CreateSpaceModal({
   };
 
   const onValid = async (data: CreateSpaceFormData) => {
+    if (!spaceId) return;
     try {
-      setInternalLoading(true);
-      await onSubmit({
-        ...data,
+      setSaving(true);
+      await callUpdateSpace(spaceId, {
+        name: data.name,
+        description: data.description ?? "",
         icon: ICONS[iconIdx].label,
         color: selectedColor,
       });
-      reset();
-      setIconIdx(0);
-      setSelectedColor(COLORS[0].hex);
-      onClose();
-      toastSuccess("Space created successfully!");
+      toastSuccess("Space updated successfully!");
+      onSuccess?.();
+      handleClose();
     } catch (error: any) {
-      toastError(error.message);
+      toastError(error.message ?? "Failed to update space.");
     } finally {
-      setInternalLoading(false);
+      setSaving(false);
     }
   };
 
@@ -124,7 +156,6 @@ export default function CreateSpaceModal({
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-
         {/* Colored top accent bar */}
         <div
           className="h-1 w-full transition-colors duration-300"
@@ -139,18 +170,25 @@ export default function CreateSpaceModal({
               className="flex h-12 w-12 items-center justify-center rounded-xl shadow-sm transition-colors duration-300 flex-shrink-0"
               style={{ backgroundColor: `${selectedColor}18` }}
             >
-              <ActiveIcon
-                className="h-6 w-6 transition-colors duration-300"
-                style={{ color: selectedColor }}
-                strokeWidth={1.75}
-              />
+              {fetching ? (
+                <Loader2
+                  className="h-6 w-6 animate-spin"
+                  style={{ color: selectedColor }}
+                />
+              ) : (
+                <ActiveIcon
+                  className="h-6 w-6 transition-colors duration-300"
+                  style={{ color: selectedColor }}
+                  strokeWidth={1.75}
+                />
+              )}
             </div>
             <div>
               <h2 className="text-base font-semibold text-neutral-900 tracking-tight">
-                Create space
+                Update space
               </h2>
               <p className="text-sm text-neutral-400 mt-0.5">
-                Set up a dedicated workspace for your team
+                Edit the details of your workspace
               </p>
             </div>
           </div>
@@ -183,7 +221,12 @@ export default function CreateSpaceModal({
                     ? "border-red-300 ring-1 ring-red-200 focus:border-red-400 focus:ring-red-200"
                     : "border-neutral-200 hover:border-neutral-300 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
                 }`}
-              style={{ "--accent": selectedColor, "--accent-ring": `${selectedColor}33` } as React.CSSProperties}
+              style={
+                {
+                  "--accent": selectedColor,
+                  "--accent-ring": `${selectedColor}33`,
+                } as React.CSSProperties
+              }
             />
             <div className="mt-1.5 flex items-center justify-between">
               <p className="text-xs text-red-400 min-h-[1rem]">
@@ -242,7 +285,10 @@ export default function CreateSpaceModal({
                     }`}
                   style={
                     iconIdx === idx
-                      ? { backgroundColor: `${selectedColor}18`, color: selectedColor }
+                      ? {
+                          backgroundColor: `${selectedColor}18`,
+                          color: selectedColor,
+                        }
                       : {}
                   }
                 >
@@ -301,15 +347,20 @@ export default function CreateSpaceModal({
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ backgroundColor: selectedColor }}
             >
-              {isLoading ? (
+              {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating…
+                  Saving…
+                </>
+              ) : fetching ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading…
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Create space
+                  <Save className="h-4 w-4" strokeWidth={2.5} />
+                  Save changes
                 </>
               )}
             </button>

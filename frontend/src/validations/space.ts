@@ -10,6 +10,8 @@ export const CreateSpaceSchema = z.object({
   description: z.string().trim().max(1000, "Description is too long"),
 
   icon: z.string().trim().max(255, "Icon is too long").optional(),
+
+  color: z.string().trim().max(255, "Color is too long").optional(),
 });
 
 export type CreateSpaceFormData = z.infer<typeof CreateSpaceSchema>;
@@ -29,6 +31,8 @@ export const UpdateSpaceSchema = z.object({
     .optional(),
 
   icon: z.string().trim().max(255, "Icon is too long").optional(),
+  
+  color: z.string().trim().max(255, "Color is too long").optional(),
 });
 
 export type UpdateSpaceFormData = z.infer<typeof UpdateSpaceSchema>;

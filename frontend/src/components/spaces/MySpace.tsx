@@ -6,7 +6,7 @@ import {
   Trash2,
   Bell,
   UserPlus,
-  Save,
+  Pencil,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -31,6 +31,8 @@ import { SpaceIcon } from "../ui/SpaceIcon";
 import { AvatarStack } from "../ui/AvatarStack";
 import AddMemberModalContent, { AddMemberModalHandle } from "./AddMemberModal";
 import { UserWorkspace } from "../../types/workspace";
+import UpdateSpaceModal from "./UpdateSpaceModal";
+import EllipsisMenu, { MenuAction } from "../ui/EllipsisMenu";
 
 const MySpace: React.FC = () => {
   const navigate = useNavigate();
@@ -48,6 +50,7 @@ const MySpace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [editingSpaceId, setEditingSpaceId] = useState<number | null>(null);
 
   const memberModalRef = useRef<AddMemberModalHandle>(null);
 
@@ -61,6 +64,11 @@ const MySpace: React.FC = () => {
     isOpen: isMemberOpen,
     open: openMember,
     close: closeMember,
+  } = useModal();
+  const {
+    isOpen: isUpdateOpen,
+    open: openUpdate,
+    close: closeUpdate,
   } = useModal();
 
   const fetchSpaces = async () => {
@@ -96,6 +104,11 @@ const MySpace: React.FC = () => {
   const handleDeleteClick = (space: Space) => {
     setSelectedSpace(space);
     openDelete();
+  };
+
+  const handleEditClick = (space: Space) => {
+    setEditingSpaceId(space.id);
+    openUpdate();
   };
 
   const handleDeleteConfirm = async () => {
@@ -154,8 +167,23 @@ const MySpace: React.FC = () => {
     }
     closeMember();
   };
+
   const renderCard = (space: Space, wide = false) => {
     const members = spaceMembersMap[space.id] ?? space.members ?? [];
+
+    const menuActions: MenuAction[] = [
+      {
+        label: "Edit space",
+        icon: <Pencil className="w-4 h-4" />,
+        onClick: () => handleEditClick(space),
+      },
+      {
+        label: "Delete space",
+        icon: <Trash2 className="w-4 h-4" />,
+        onClick: () => handleDeleteClick(space),
+        variant: "danger",
+      },
+    ];
 
     return (
       <div
@@ -164,20 +192,19 @@ const MySpace: React.FC = () => {
           wide ? "lg:col-span-2" : ""
         }`}
       >
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDeleteClick(space);
-          }}
-          className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10"
-          title="Delete space"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {/* Action buttons — visible on hover */}
+        <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <EllipsisMenu actions={menuActions} align="right" />
+        </div>
 
         <div className="flex justify-between items-start mb-6">
+          {/* Icon container — uses space.color if available */}
           <div
-            className={`${wide ? "w-16 h-16" : "w-12 h-12"} flex-shrink-0 rounded-lg bg-primary-container flex items-center justify-center text-primary`}
+            className={`${wide ? "w-16 h-16" : "w-12 h-12"} flex-shrink-0 rounded-lg flex items-center justify-center`}
+            style={{
+              backgroundColor: space.color ? `${space.color}18` : undefined,
+              color: space.color ?? undefined,
+            }}
           >
             <SpaceIcon
               icon={space.icon}
@@ -185,7 +212,7 @@ const MySpace: React.FC = () => {
             />
           </div>
           {space.workspaceId?.name && (
-            <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-md mr-7">
+            <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-md mr-16">
               {space.workspaceId.name}
             </span>
           )}
@@ -380,7 +407,9 @@ const MySpace: React.FC = () => {
                         </span>
                       </p>
                       <span className="space-y-4 text-[10px] text-on-surface-variant">
-                        {space.workspace?.userWorkspaces?.find((uw: UserWorkspace) => uw.invitedBy !== null)?.inviter?.fullName ?? ""}
+                        {space.workspace?.userWorkspaces?.find(
+                          (uw: UserWorkspace) => uw.invitedBy !== null,
+                        )?.inviter?.fullName ?? ""}
                       </span>
                     </div>
                   </div>
@@ -396,6 +425,16 @@ const MySpace: React.FC = () => {
         isOpen={isOpen}
         onClose={close}
         onSubmit={handleCreate}
+      />
+
+      <UpdateSpaceModal
+        isOpen={isUpdateOpen}
+        spaceId={editingSpaceId}
+        onClose={() => {
+          closeUpdate();
+          setEditingSpaceId(null);
+        }}
+        onSuccess={fetchSpaces}
       />
 
       <ConfirmDeleteModal

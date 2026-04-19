@@ -4,14 +4,14 @@ export interface CreateSpace {
   name: string;
   description: string;
   icon?: string;
-  isPublic?: boolean;
+  color?: string;
 }
 
 export interface UpdateSpace {
   name: string;
   description: string;
   icon?: string;
-  isPublic?: boolean;
+  color?: string;
 }
 export interface SpaceMember {
   id: number;
@@ -25,6 +25,7 @@ export interface Space {
   name: string;
   description: string;
   icon: string;
+  color: string;
   createdAt: Date;
   workspaceId: {
     id: number;
