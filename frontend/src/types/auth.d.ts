@@ -16,6 +16,9 @@ export interface User {
   phone: string;
   role: string;
   avatar: string;
+}
+
+export interface UserWithWorkSpace extends User {
   UserWorkspace: {
     role: string;
     acceptedAt: Date;
@@ -28,5 +31,5 @@ export interface User {
 }
 
 export interface CurrentUserState {
-  currentUser: User;
+  currentUser: User & { workspaces?: Workspace[] };
 }

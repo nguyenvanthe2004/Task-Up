@@ -16,26 +16,6 @@ const Header: React.FC = () => {
           </span>
           <span className="text-lg font-bold text-slate-900">TaskUp</span>
         </div>
-        <div className="hidden md:flex gap-6 items-center">
-          <a
-            className="text-slate-500 hover:text-slate-900 transition-colors antialiased"
-            href="#"
-          >
-            Space
-          </a>
-          <a
-            className="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium antialiased"
-            href="#"
-          >
-            Project
-          </a>
-          <a
-            className="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium antialiased"
-            href="#"
-          >
-            List
-          </a>
-        </div>
       </div>
       <div className="flex items-center gap-4">
         <div className="hidden md:flex items-center gap-2">

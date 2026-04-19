@@ -13,6 +13,7 @@ interface ModalProps {
   width?: string;
   loading?: boolean;
   disabled?: boolean,
+  confirmDisabled?: boolean;
   variant?: "default" | "danger" | "success";
 }
 
@@ -28,6 +29,7 @@ const Modal: React.FC<ModalProps> = ({
   width = "max-w-md",
   loading = false,
   variant = "default",
+  confirmDisabled = false,
 }) => {
   if (!isOpen) return null;
 
