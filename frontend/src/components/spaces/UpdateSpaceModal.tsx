@@ -252,7 +252,18 @@ export default function UpdateSpaceModal({
               rows={3}
               maxLength={1000}
               disabled={isLoading}
-              className="w-full resize-none rounded-xl border border-neutral-200 hover:border-neutral-300 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all focus:border-neutral-400 focus:ring-1 focus:ring-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full rounded-xl border px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                ${
+                  errors.name
+                    ? "border-red-300 ring-1 ring-red-200 focus:border-red-400 focus:ring-red-200"
+                    : "border-neutral-200 hover:border-neutral-300 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
+                }`}
+              style={
+                {
+                  "--accent": selectedColor,
+                  "--accent-ring": `${selectedColor}33`,
+                } as React.CSSProperties
+              }
             />
             <div className="mt-1 flex justify-between">
               <p className="text-xs text-red-400 min-h-[1rem]">

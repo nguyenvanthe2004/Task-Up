@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-export const CreateSpaceSchema = z.object({
+export const CreateCategorySchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Space name is required")
-    .max(255, "Space name is too long"),
+    .min(1, "Category name is required")
+    .max(255, "Category name is too long"),
 
   description: z.string().trim().min(1, "Description is required").max(1000, "Description is too long"),
 
@@ -14,14 +14,14 @@ export const CreateSpaceSchema = z.object({
   color: z.string().trim().max(255, "Color is too long").optional(),
 });
 
-export type CreateSpaceFormData = z.infer<typeof CreateSpaceSchema>;
+export type CreateCategoryFormData = z.infer<typeof CreateCategorySchema>;
 
-export const UpdateSpaceSchema = z.object({
+export const UpdateCategorySchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Space name is required")
-    .max(255, "Space name is too long")
+    .min(1, "Category name is required")
+    .max(255, "Category name is too long")
     .optional(),
 
   description: z
@@ -36,4 +36,4 @@ export const UpdateSpaceSchema = z.object({
   color: z.string().trim().max(255, "Color is too long").optional(),
 });
 
-export type UpdateSpaceFormData = z.infer<typeof UpdateSpaceSchema>;
+export type UpdateCategoryFormData = z.infer<typeof UpdateCategorySchema>;

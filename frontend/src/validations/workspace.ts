@@ -8,6 +8,7 @@ export const CreateWorkspaceSchema = z.object({
 
   description: z
     .string()
+    .min(1, "Description is required")
     .max(1000, "Description is too long")
     .optional(),
 });
@@ -25,6 +26,7 @@ export const UpdateWorkspaceSchema = z.object({
   description: z
     .string()
     .trim()
+    .min(1, "Description is required")
     .max(1000, "Description is too long")
     .optional(),
 });

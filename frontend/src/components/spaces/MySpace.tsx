@@ -7,6 +7,7 @@ import {
   Bell,
   UserPlus,
   Pencil,
+  User,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -33,6 +34,7 @@ import AddMemberModalContent, { AddMemberModalHandle } from "./AddMemberModal";
 import { UserWorkspace } from "../../types/workspace";
 import UpdateSpaceModal from "./UpdateSpaceModal";
 import EllipsisMenu, { MenuAction } from "../ui/EllipsisMenu";
+import dayjs from "dayjs";
 
 const MySpace: React.FC = () => {
   const navigate = useNavigate();
@@ -173,12 +175,12 @@ const MySpace: React.FC = () => {
 
     const menuActions: MenuAction[] = [
       {
-        label: "Edit space",
+        label: "Edit",
         icon: <Pencil className="w-4 h-4" />,
         onClick: () => handleEditClick(space),
       },
       {
-        label: "Delete space",
+        label: "Delete",
         icon: <Trash2 className="w-4 h-4" />,
         onClick: () => handleDeleteClick(space),
         variant: "danger",
@@ -238,7 +240,7 @@ const MySpace: React.FC = () => {
           </button>
           <button
             onClick={() =>
-              navigate("overview", { state: { spaceId: space.id } })
+              navigate(`${space.id}/overview`, { state: { spaceId: space.id } })
             }
             className="text-primary text-sm font-bold hover:underline"
           >
@@ -402,11 +404,12 @@ const MySpace: React.FC = () => {
                         was created in{" "}
                         <span className="font-bold text-on-surface">
                           {space.createdAt
-                            ? new Date(space.createdAt).toLocaleDateString()
+                            ? dayjs(space.createdAt).format("MMM D, YYYY")
                             : "Unknown Workspace"}
                         </span>
                       </p>
-                      <span className="space-y-4 text-[10px] text-on-surface-variant">
+                      <span className="flex items-center gap-1 space-y-4 text-[10px] text-on-surface-variant">
+                        <User size={12}/>{" "}
                         {space.workspace?.userWorkspaces?.find(
                           (uw: UserWorkspace) => uw.invitedBy !== null,
                         )?.inviter?.fullName ?? ""}
