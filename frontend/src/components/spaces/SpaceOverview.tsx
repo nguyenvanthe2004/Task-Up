@@ -1,192 +1,39 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import CustomTable from "../ui/CustomTable";
-import { priorityBadge, statusBadge } from "../../constants";
-import { Task, TaskGroup } from "../../types/task";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Task } from "../../types/task";
 import KanbanBoard from "../tasks/KanbanBoard";
 import CalendarView from "../tasks/CalendarView";
 import DetailTask from "../tasks/DetailTask";
 import ListView from "../tasks/ListView";
+import Categories from "../categories/Categories";
+import { Space } from "../../types/space";
+import { toastError } from "../../lib/toast";
+import { callGetSpaceById } from "../../services/space";
+import { AvatarStack } from "../ui/AvatarStack";
 
 type SpaceView = "overview" | "list" | "kanban" | "calendar";
 
 const SpaceOverview: React.FC = () => {
+  const { spaceId } = useParams<{ spaceId: string }>();
   const [view, setView] = useState<SpaceView>("overview");
-  const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const navigate = useNavigate();
+  const [space, setSpace] = useState<Space | null>(null);
 
-  const folders = [
-    {
-      id: "creative",
-      name: "Creative Brand Folder",
-      icon: "folder",
-      color: "text-amber-500 bg-amber-50",
-      count: 12,
-      updated: "5h ago",
-      files: [
-        {
-          name: "Brand_Guidelines_v3.pdf",
-          type: "pdf",
-          size: "4.2 MB",
-          by: "Sarah Jenkins",
-          time: "5h ago",
-        },
-        {
-          name: "Logo_Assets_Final.zip",
-          type: "zip",
-          size: "18 MB",
-          by: "Sarah Jenkins",
-          time: "5h ago",
-        },
-        {
-          name: "Color_Palette_2024.fig",
-          type: "fig",
-          size: "2.1 MB",
-          by: "Sarah Jenkins",
-          time: "5h ago",
-        },
-      ],
-    },
-    {
-      id: "strategy",
-      name: "Strategy & Planning",
-      icon: "folder_special",
-      color: "text-blue-500 bg-blue-50",
-      count: 8,
-      updated: "1d ago",
-      files: [
-        {
-          name: "Q4_Strategy_Deck_v2.pdf",
-          type: "pdf",
-          size: "3.7 MB",
-          by: "Sarah",
-          time: "2h ago",
-        },
-        {
-          name: "Budget_Allocation_FY24.xls",
-          type: "xls",
-          size: "1.2 MB",
-          by: "Marc",
-          time: "1d ago",
-        },
-        {
-          name: "Competitor_Analysis.docx",
-          type: "doc",
-          size: "980 KB",
-          by: "David Chen",
-          time: "2d ago",
-        },
-      ],
-    },
-    {
-      id: "influencer",
-      name: "Influencer Contracts",
-      icon: "folder_shared",
-      color: "text-purple-500 bg-purple-50",
-      count: 5,
-      updated: "3h ago",
-      files: [
-        {
-          name: "TikTok_Contract_Draft.pdf",
-          type: "pdf",
-          size: "1.1 MB",
-          by: "Legal",
-          time: "3h ago",
-        },
-        {
-          name: "NDA_Template_2024.docx",
-          type: "doc",
-          size: "456 KB",
-          by: "Legal",
-          time: "1d ago",
-        },
-      ],
-    },
-    {
-      id: "ad-creative",
-      name: "Ad Creative Assets",
-      icon: "folder_copy",
-      color: "text-pink-500 bg-pink-50",
-      count: 21,
-      updated: "30m ago",
-      files: [
-        {
-          name: "Banner_1080x1080.png",
-          type: "img",
-          size: "2.8 MB",
-          by: "Design Team",
-          time: "30m ago",
-        },
-        {
-          name: "Story_Template_v2.psd",
-          type: "psd",
-          size: "45 MB",
-          by: "Design Team",
-          time: "2h ago",
-        },
-        {
-          name: "Video_Thumbnail_Set.zip",
-          type: "zip",
-          size: "12 MB",
-          by: "Design Team",
-          time: "3h ago",
-        },
-      ],
-    },
-  ];
-
-  const recentFiles = [
-    {
-      name: "Q4_Strategy_Deck_v2.pdf",
-      type: "pdf",
-      folder: "Strategy & Planning",
-      by: "Sarah",
-      time: "2h ago",
-    },
-    {
-      name: "Budget_Allocation_FY24.xls",
-      type: "xls",
-      folder: "Strategy & Planning",
-      by: "Marc",
-      time: "1d ago",
-    },
-    {
-      name: "Brand_Guidelines_v3.pdf",
-      type: "pdf",
-      folder: "Creative Brand Folder",
-      by: "Sarah Jenkins",
-      time: "5h ago",
-    },
-    {
-      name: "TikTok_Contract_Draft.pdf",
-      type: "pdf",
-      folder: "Influencer Contracts",
-      by: "Legal",
-      time: "3h ago",
-    },
-    {
-      name: "Banner_1080x1080.png",
-      type: "img",
-      folder: "Ad Creative Assets",
-      by: "Design Team",
-      time: "30m ago",
-    },
-  ];
-
-  const getFileIcon = (type: string) => {
-    const map: Record<string, { icon: string; color: string }> = {
-      pdf: { icon: "description", color: "bg-blue-50 text-blue-600" },
-      xls: { icon: "table_chart", color: "bg-purple-50 text-purple-600" },
-      doc: { icon: "article", color: "bg-indigo-50 text-indigo-600" },
-      img: { icon: "image", color: "bg-green-50 text-green-600" },
-      png: { icon: "image", color: "bg-green-50 text-green-600" },
-      zip: { icon: "folder_zip", color: "bg-amber-50 text-amber-600" },
-      fig: { icon: "draw", color: "bg-pink-50 text-pink-600" },
-      psd: { icon: "palette", color: "bg-pink-50 text-pink-600" },
-    };
-    return map[type] || { icon: "draft", color: "bg-slate-50 text-slate-600" };
+  const fetchSpaceDetails = async () => {
+    try {
+      const res = await callGetSpaceById(Number(spaceId));
+      setSpace(res.data);
+    } catch (error: any) {
+      toastError(error.message);
+    }
   };
+
+  useEffect(() => {
+    fetchSpaceDetails();
+  }, [spaceId]);
+
+  console.log(space);
 
   const VIEW_TABS: { key: SpaceView; icon: string; label: string }[] = [
     { key: "overview", icon: "grid_view", label: "Overview" },
@@ -212,14 +59,14 @@ const SpaceOverview: React.FC = () => {
                 chevron_right
               </span>
               <span className="text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-widest">
-                Marketing Q4
+                {space?.name}
               </span>
             </nav>
             <h2 className="text-[1.5rem] font-extrabold text-on-surface tracking-tight">
-              Marketing Q4 Launch
+              {space?.name || "Space Name"}
             </h2>
             <p className="text-on-surface-variant mt-1">
-              Coordination for Q4 product releases and brand campaigns.
+              {space?.description || "No description provided."}
             </p>
           </div>
 
@@ -246,27 +93,10 @@ const SpaceOverview: React.FC = () => {
 
             {/* Avatars */}
             <div
-              onClick={() => navigate("/spaces/members")}
-              className="flex -space-x-2"
+              onClick={() => navigate("")}
+              className="flex -space-x-2 pt-4 cursor-pointer"
             >
-              <img
-                className="w-8 h-8 rounded-full border-2 border-surface-container-lowest"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuADkwurbZVIP0oNv8tLXXMa9ZCC5EUgJdiDDarGlCq9AiYT-oi6sdH1Uf2Zwfq0YLFFZD9-LvX8LsHr0eCsEr-9rlUwA1AhbCEnbiAe_M7FO3I3CFz7oICvsKMb74N8pTFRVCyiMU8BUVBbwptSGR4F4-y4bM3fivEPUSUqrhFy1R3qvsTEAr897tOvFz7vyKPs8tXUofGnOH025tHc2lzazYkDyvHNe8XL5jxD95m90WnF2agPypcbXUg0I3p--lnNTQpqxHzhTkE"
-                alt=""
-              />
-              <img
-                className="w-8 h-8 rounded-full border-2 border-surface-container-lowest"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSqHV0fmLb20ERcVBfNcjD_b-9BEfHIzU3gUYyKCzYl-7WxC_eW1HyqAVbqXLyY4IuIyxnEjFplu1ig-HeIdN0iJa9ls7AjoEUreDVq6Rp753jxDXZf5UpnSa5wNO8a5wNxaDklJUxsivD7aroB4aYe2nfQY68bwF4yWMVWlX7siEesWfS9p9bQIZdiDqRNZqC3PLLiXS2PHzynt20sGHG1Oh5XLwcP1EOAA5sGwILNJaxnMgfKlKshwSGSuSULT4PgO1ipDArmqc"
-                alt=""
-              />
-              <img
-                className="w-8 h-8 rounded-full border-2 border-surface-container-lowest"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrXW0TdjAu0w0sw_OHifet5oGgcASAbJPNnBK8jzRd5CzrJHdzlKcd2DHVaHe95u-QHIti6vg-9xVwN7zui5O_751INcoVyFw5lAPhZ_Ns-gCRYdLFQXxOxx2sWgFZa4sytFagQxUtHtLxRguCFgEEXZRWrLEDuL2iYjhBXyovRBhCeAYyw_5otkm9TeGFzVxzeeketTwkCoVAlZhJ6JDRrB6jT9CuTBMF5aYU0tQYTrLeEw0AYT-pRu0KX6JlwO6YDcmYmtgt9ZY"
-                alt=""
-              />
-              <div className="w-8 h-8 rounded-full bg-slate-200 border-2 border-surface-container-lowest flex items-center justify-center text-[10px] font-bold text-slate-600">
-                +12
-              </div>
+              <AvatarStack members={space?.members || []} />
             </div>
           </div>
         </div>
@@ -550,182 +380,7 @@ const SpaceOverview: React.FC = () => {
             </div>
 
             {/* Files & Folders */}
-            <div className="col-span-12">
-              <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-white/50 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-on-surface flex items-center gap-2">
-                    <span
-                      className="material-symbols-outlined text-lg text-primary"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      folder_open
-                    </span>
-                    Files &amp; Folders
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 text-[0.6875rem] font-bold text-on-surface-variant hover:text-primary px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                      <span className="material-symbols-outlined text-[14px]">
-                        upload
-                      </span>
-                      Upload
-                    </button>
-                    <button className="flex items-center gap-1.5 text-[0.6875rem] font-bold text-on-surface-variant hover:text-primary px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                      <span className="material-symbols-outlined text-[14px]">
-                        create_new_folder
-                      </span>
-                      New Folder
-                    </button>
-                  </div>
-                </div>
-                <div className="p-6 border-b border-slate-50">
-                  <p className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider mb-4">
-                    Folders
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {folders.map((folder) => (
-                      <button
-                        key={folder.id}
-                        onClick={() =>
-                          setActiveFolder(
-                            activeFolder === folder.id ? null : folder.id,
-                          )
-                        }
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left group ${
-                          activeFolder === folder.id
-                            ? "border-primary bg-primary-container/20"
-                            : "border-outline-variant hover:border-primary hover:bg-slate-50"
-                        }`}
-                      >
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${folder.color}`}
-                        >
-                          <span
-                            className="material-symbols-outlined text-[22px]"
-                            style={{ fontVariationSettings: "'FILL' 1" }}
-                          >
-                            {folder.icon}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[0.6875rem] font-bold text-on-surface truncate">
-                            {folder.name}
-                          </p>
-                          <p className="text-[0.625rem] text-on-surface-variant">
-                            {folder.count} files • {folder.updated}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {activeFolder && (
-                  <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="material-symbols-outlined text-[14px] text-primary">
-                        subdirectory_arrow_right
-                      </span>
-                      <p className="text-[0.6875rem] font-bold text-primary uppercase tracking-wider">
-                        {folders.find((f) => f.id === activeFolder)?.name}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      {folders
-                        .find((f) => f.id === activeFolder)
-                        ?.files.map((file, i) => {
-                          const { icon, color } = getFileIcon(file.type);
-                          return (
-                            <div
-                              key={i}
-                              className="flex items-center gap-3 p-2.5 hover:bg-white rounded-lg transition-colors cursor-pointer group"
-                            >
-                              <div
-                                className={`w-8 h-8 flex items-center justify-center rounded ${color}`}
-                              >
-                                <span
-                                  className="material-symbols-outlined text-lg"
-                                  style={{ fontVariationSettings: "'FILL' 1" }}
-                                >
-                                  {icon}
-                                </span>
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-[0.6875rem] font-bold text-on-surface">
-                                  {file.name}
-                                </p>
-                                <p className="text-[0.625rem] text-on-surface-variant uppercase">
-                                  {file.size} • by {file.by} • {file.time}
-                                </p>
-                              </div>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button className="p-1 hover:bg-slate-100 rounded">
-                                  <span className="material-symbols-outlined text-sm text-outline">
-                                    download
-                                  </span>
-                                </button>
-                                <button className="p-1 hover:bg-slate-100 rounded">
-                                  <span className="material-symbols-outlined text-sm text-outline">
-                                    more_vert
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
-                <div className="p-6">
-                  <p className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider mb-4">
-                    Recently Modified
-                  </p>
-                  <div className="divide-y divide-slate-50">
-                    {recentFiles.map((file, i) => {
-                      const { icon, color } = getFileIcon(file.type);
-                      return (
-                        <div
-                          key={i}
-                          className="flex items-center gap-4 py-3 hover:bg-slate-50 px-2 rounded-lg -mx-2 transition-colors cursor-pointer group"
-                        >
-                          <div
-                            className={`w-9 h-9 flex items-center justify-center rounded-lg ${color}`}
-                          >
-                            <span
-                              className="material-symbols-outlined text-lg"
-                              style={{ fontVariationSettings: "'FILL' 1" }}
-                            >
-                              {icon}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[0.6875rem] font-bold text-on-surface truncate">
-                              {file.name}
-                            </p>
-                            <p className="text-[0.625rem] text-on-surface-variant uppercase">
-                              {file.folder} • by {file.by}
-                            </p>
-                          </div>
-                          <span className="text-[0.625rem] text-outline whitespace-nowrap">
-                            {file.time}
-                          </span>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1 hover:bg-slate-100 rounded">
-                              <span className="material-symbols-outlined text-sm text-outline">
-                                download
-                              </span>
-                            </button>
-                            <button className="p-1 hover:bg-slate-100 rounded">
-                              <span className="material-symbols-outlined text-sm text-outline">
-                                more_vert
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Categories />
           </div>
         )}
         {view === "list" && <ListView />}

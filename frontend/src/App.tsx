@@ -58,7 +58,7 @@ function App() {
           <Route path="my-tasks" element={<MyTaskPage />} />
           <Route path="spaces">
             <Route index element={<MySpacePage />} />
-            <Route path="overview" element={<SpaceOverviewPage />} />
+            <Route path=":spaceId/overview" element={<SpaceOverviewPage />} />
             <Route path="members" element={<SpaceMemberPage />} />
           </Route>
 

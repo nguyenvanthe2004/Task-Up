@@ -1,50 +1,54 @@
+import { Loader2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  CreateWorkspaceFormData,
-  CreateWorkspaceSchema,
-} from "../../validations/workspace";
-import { callCreateWorkspace } from "../../services/workspace";
-import { Workspace } from "../../types/workspace";
-import {
-  Rocket,
-  Briefcase,
-  Zap,
-  Target,
-  Puzzle,
-  Flame,
-  Star,
-  Package,
-  Wrench,
-  Palette,
-  Globe,
-  ShieldCheck,
-  BarChart2,
-  Users,
-  BookOpen,
-  X,
-  Plus,
-  Loader2,
+  Folder,
+  FolderOpen,
+  FolderKanban,
+  FolderGit2,
+  FolderHeart,
+  FolderLock,
+  FolderSearch,
+  FolderSync,
+  FolderTree,
+  FolderCheck,
+  FolderClock,
+  FolderArchive,
+  FolderInput,
+  FolderOutput,
+  FolderMinus,
+  FolderPlus,
+  FolderX,
+  FolderSymlink,
+  FolderDot,
 } from "lucide-react";
-import { toastError } from "../../lib/toast";
+import {
+  CreateCategoryFormData,
+  CreateCategorySchema,
+} from "../../validations/category";
+import { toastError, toastSuccess } from "../../lib/toast";
 
 const ICONS = [
-  { icon: Rocket, label: "Rocket" },
-  { icon: Briefcase, label: "Briefcase" },
-  { icon: Zap, label: "Zap" },
-  { icon: Target, label: "Target" },
-  { icon: Puzzle, label: "Puzzle" },
-  { icon: Flame, label: "Flame" },
-  { icon: Star, label: "Star" },
-  { icon: Package, label: "Package" },
-  { icon: Wrench, label: "Wrench" },
-  { icon: Palette, label: "Palette" },
-  { icon: Globe, label: "Globe" },
-  { icon: ShieldCheck, label: "Shield" },
-  { icon: BarChart2, label: "Chart" },
-  { icon: Users, label: "Team" },
-  { icon: BookOpen, label: "Docs" },
+  { icon: Folder, label: "Folder" },
+  { icon: FolderOpen, label: "FolderOpen" },
+  { icon: FolderKanban, label: "FolderKanban" },
+  { icon: FolderGit2, label: "FolderGit2" },
+  { icon: FolderHeart, label: "FolderHeart" },
+  { icon: FolderLock, label: "FolderLock" },
+  { icon: FolderSearch, label: "FolderSearch" },
+  { icon: FolderSync, label: "FolderSync" },
+  { icon: FolderTree, label: "FolderTree" },
+  { icon: FolderCheck, label: "FolderCheck" },
+  { icon: FolderClock, label: "FolderClock" },
+  { icon: FolderArchive, label: "FolderArchive" },
+  { icon: FolderInput, label: "FolderInput" },
+  { icon: FolderOutput, label: "FolderOutput" },
+  { icon: FolderMinus, label: "FolderMinus" },
+  { icon: FolderPlus, label: "FolderPlus" },
+  { icon: FolderX, label: "FolderX" },
+  { icon: FolderSymlink, label: "FolderSymlink" },
+  { icon: FolderDot, label: "FolderDot" },
 ];
 
 const COLORS = [
@@ -58,19 +62,19 @@ const COLORS = [
   { hex: "#64748B", label: "Slate" },
 ];
 
-interface CreateWorkspaceModalProps {
+interface CreateCategoryModalProps {
   isOpen: boolean;
   isLoading?: boolean;
   onClose: () => void;
-  onSuccess?: (workspace: Workspace) => void;
+  onSubmit: (data: CreateCategoryFormData) => Promise<void>;
 }
 
-export default function CreateWorkspaceModal({
+export default function CreateCategoryModal({
   isOpen,
   isLoading: externalLoading,
   onClose,
-  onSuccess,
-}: CreateWorkspaceModalProps) {
+  onSubmit,
+}: CreateCategoryModalProps) {
   const [iconIdx, setIconIdx] = useState(0);
   const [selectedColor, setSelectedColor] = useState(COLORS[0].hex);
   const [internalLoading, setInternalLoading] = useState(false);
@@ -83,8 +87,8 @@ export default function CreateWorkspaceModal({
     reset,
     watch,
     formState: { errors },
-  } = useForm<CreateWorkspaceFormData>({
-    resolver: zodResolver(CreateWorkspaceSchema),
+  } = useForm<CreateCategoryFormData>({
+    resolver: zodResolver(CreateCategorySchema),
     defaultValues: { name: "", description: "" },
   });
 
@@ -99,17 +103,19 @@ export default function CreateWorkspaceModal({
     onClose();
   };
 
-  const onSubmit = async (data: CreateWorkspaceFormData) => {
+  const onValid = async (data: CreateCategoryFormData) => {
     try {
       setInternalLoading(true);
-      const res = await callCreateWorkspace({
-        name: data.name,
-        description: data.description ?? "",
+      await onSubmit({
+        ...data,
         icon: ICONS[iconIdx].label,
         color: selectedColor,
       });
-      onSuccess?.(res.data.dataValues);
-      handleClose();
+      reset();
+      setIconIdx(0);
+      setSelectedColor(COLORS[0].hex);
+      onClose();
+      toastSuccess("Category created successfully!");
     } catch (error: any) {
       toastError(error.message);
     } finally {
@@ -136,7 +142,6 @@ export default function CreateWorkspaceModal({
         {/* Header */}
         <div className="flex items-start justify-between px-7 pt-6 pb-5 border-b border-neutral-100">
           <div className="flex items-center gap-4">
-            {/* Icon preview */}
             <div
               className="flex h-12 w-12 items-center justify-center rounded-xl shadow-sm transition-colors duration-300 flex-shrink-0"
               style={{ backgroundColor: `${selectedColor}18` }}
@@ -149,10 +154,10 @@ export default function CreateWorkspaceModal({
             </div>
             <div>
               <h2 className="text-base font-semibold text-neutral-900 tracking-tight">
-                Create workspace
+                Create category
               </h2>
               <p className="text-sm text-neutral-400 mt-0.5">
-                Organize your projects and collaborate with your team
+                Organize your content with a new category
               </p>
             </div>
           </div>
@@ -168,15 +173,15 @@ export default function CreateWorkspaceModal({
 
         {/* Body */}
         <div className="px-7 py-6 space-y-6">
-          {/* Workspace Name */}
+          {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-2">
-              Workspace name <span className="text-red-400">*</span>
+              Category name <span className="text-red-400">*</span>
             </label>
             <input
               {...register("name")}
               type="text"
-              placeholder="e.g. Marketing Team, Product Design…"
+              placeholder="e.g. Design Assets, Contracts, Reports…"
               maxLength={255}
               disabled={isLoading}
               className={`w-full rounded-xl border px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
@@ -185,7 +190,6 @@ export default function CreateWorkspaceModal({
                     ? "border-red-300 ring-1 ring-red-200 focus:border-red-400 focus:ring-red-200"
                     : "border-neutral-200 hover:border-neutral-300 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
                 }`}
-              // @ts-ignore
               style={
                 {
                   "--accent": selectedColor,
@@ -213,17 +217,16 @@ export default function CreateWorkspaceModal({
             </label>
             <textarea
               {...register("description")}
-              placeholder="What's this workspace for? Add context for your team…"
+              placeholder="What is this category for?"
               rows={3}
               maxLength={1000}
               disabled={isLoading}
               className={`w-full rounded-xl border px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
                 ${
-                  errors.name
+                  errors.description
                     ? "border-red-300 ring-1 ring-red-200 focus:border-red-400 focus:ring-red-200"
                     : "border-neutral-200 hover:border-neutral-300 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
                 }`}
-              // @ts-ignore
               style={
                 {
                   "--accent": selectedColor,
@@ -231,7 +234,7 @@ export default function CreateWorkspaceModal({
                 } as React.CSSProperties
               }
             />
-            <div className="mt-1 flex items-center justify-between">
+            <div className="mt-1 flex justify-between">
               <p className="text-xs text-red-400 min-h-[1rem]">
                 {errors.description?.message ?? ""}
               </p>
@@ -294,8 +297,7 @@ export default function CreateWorkspaceModal({
                   {selectedColor === c.hex && (
                     <span
                       className="absolute inset-0 rounded-full ring-2 ring-offset-2 ring-[var(--c)]"
-                      // @ts-ignore
-                      style={{ "--c": c.hex }}
+                      style={{ "--c": c.hex } as React.CSSProperties}
                     />
                   )}
                 </button>
@@ -320,7 +322,7 @@ export default function CreateWorkspaceModal({
             </button>
             <button
               type="button"
-              onClick={handleSubmit(onSubmit)}
+              onClick={handleSubmit(onValid)}
               disabled={isLoading}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ backgroundColor: selectedColor }}
@@ -333,7 +335,7 @@ export default function CreateWorkspaceModal({
               ) : (
                 <>
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Create workspace
+                  Create category
                 </>
               )}
             </button>
