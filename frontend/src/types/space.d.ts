@@ -1,3 +1,4 @@
+import { Category } from "./category";
 import { UserWorkspace } from "./workspace";
 
 export interface CreateSpace {
@@ -38,4 +39,5 @@ export interface Space {
     ownerId: number;
     userWorkspaces: UserWorkspace[];
   };
+  categories: Category[];
 }

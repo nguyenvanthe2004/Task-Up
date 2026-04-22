@@ -17,6 +17,7 @@ import SpaceMemberPage from "./pages/spaces/SpaceMemberPage";
 import MemberPage from "./pages/workspace/MemberPage";
 import LoadingPage from "./components/ui/LoadingPage";
 import PrivateRoute from "./components/PrivateRoute";
+import ListDetailPage from "./pages/lists/ListDetailPage";
 
 function App() {
   const dispatch = useDispatch();
@@ -58,8 +59,11 @@ function App() {
           <Route path="my-tasks" element={<MyTaskPage />} />
           <Route path="spaces">
             <Route index element={<MySpacePage />} />
-            <Route path=":spaceId/overview" element={<SpaceOverviewPage />} />
-            <Route path="members" element={<SpaceMemberPage />} />
+            <Route path=":spaceId">
+              <Route index element={<SpaceOverviewPage />} />
+              <Route path="members" element={<SpaceMemberPage />} />
+              <Route path=":categoryId/:listId" element={<ListDetailPage />} />
+            </Route>
           </Route>
 
           <Route path="settings" element={<ProfilePage />} />

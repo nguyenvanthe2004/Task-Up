@@ -1,38 +1,37 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/db";
-import List from "./List";
-import Space from "./Space";
 
-interface CategoryAttributes {
+interface ListAttributes {
   id: number;
   name: string;
   description: string;
   icon?: string;
   color?: string;
-  spaceId: number;
+  isPublic?: boolean;
+  categoryId: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface CategoryCreationAttributes extends Optional<CategoryAttributes, "id"> {}
+interface ListCreationAttributes extends Optional<ListAttributes, "id"> {}
 
-export class Category
-  extends Model<CategoryAttributes, CategoryCreationAttributes>
-  implements CategoryAttributes
+export class List
+  extends Model<ListAttributes, ListCreationAttributes>
+  implements ListAttributes
 {
   declare id: number;
   declare name: string;
   declare description: string;
   declare icon: string;
   declare color: string;
-  declare spaceId: number;
+  declare isPublic: boolean;
+  declare categoryId: number;
 
-  declare readonly lists: List[];
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
 
-Category.init(
+List.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -55,16 +54,21 @@ Category.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    spaceId: {
+    isPublic: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    categoryId: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
   },
   {
     sequelize,
-    tableName: "categories",
+    tableName: "lists",
     timestamps: true,
   },
 );
 
-export default Category;
+export default List;

@@ -2,7 +2,7 @@ import { Service } from "typedi";
 import Space from "../models/Space";
 import UserSpace from "../models/UserSpace";
 import UserWorkspace from "../models/UserWorkspace";
-import { User, Workspace } from "../models";
+import { Category, List, User, Workspace } from "../models";
 import { CreateSpaceInput, UpdateSpaceInput } from "../types/space";
 
 @Service()
@@ -17,6 +17,24 @@ export class SpaceRepository {
           as: "members",
           attributes: ["id", "fullName", "email", "avatar"],
           through: { attributes: [] },
+        },
+        {
+          model: Workspace,
+          as: "workspace",
+          attributes: ["id", "name", "ownerId"],
+          include: [
+            {
+              model: UserWorkspace,
+              as: "userWorkspaces",
+              include: [
+                {
+                  model: User,
+                  as: "inviter",
+                  attributes: ["id", "email", "fullName"],
+                },
+              ],
+            },
+          ],
         },
       ],
     });
@@ -50,6 +68,16 @@ export class SpaceRepository {
                   attributes: ["id", "email", "fullName"],
                 },
               ],
+            },
+          ],
+        },
+        {
+          model: Category,
+          as: "categories",
+          include: [
+            {
+              model: List,
+              as: "lists",
             },
           ],
         },

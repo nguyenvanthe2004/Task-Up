@@ -1,26 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
-import {
-  Folder,
-  FolderOpen,
-  FolderKanban,
-  FolderGit2,
-  FolderHeart,
-  FolderLock,
-  FolderSearch,
-  FolderSync,
-  FolderTree,
-  FolderCheck,
-  FolderClock,
-  FolderArchive,
-  FolderInput,
-  FolderOutput,
-  FolderMinus,
-  FolderPlus,
-  FolderX,
-  FolderSymlink,
-  FolderDot,
-} from "lucide-react";
+
 import { Category } from "../../types/category";
 import {
   callGetCategories,
@@ -37,52 +17,27 @@ import { useModal } from "../../hook/useModal";
 import CreateCategoryModal from "./CreateCategoryModal";
 import UpdateCategoryModal from "./UpdateCategoryModal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import EllipsisMenu, { MenuAction } from "../ui/EllipsisMenu";
+import { List } from "../../types/list";
+import {
+  callCreateList,
+  callGetLists,
+  callUpdateList,
+  callDeleteList,
+} from "../../services/list";
+import CreateListModal from "../lists/CreateListModal";
+import UpdateListModal from "../lists/UpdateListModal";
+import { Icon } from "../ui/Icon";
 
-// ── Icon resolver ─────────────────────────────────────────────────────────────
-const ICON_MAP: Record<string, React.ElementType> = {
-  Folder,
-  FolderOpen,
-  FolderKanban,
-  FolderGit2,
-  FolderHeart,
-  FolderLock,
-  FolderSearch,
-  FolderSync,
-  FolderTree,
-  FolderCheck,
-  FolderClock,
-  FolderArchive,
-  FolderInput,
-  FolderOutput,
-  FolderMinus,
-  FolderPlus,
-  FolderX,
-  FolderSymlink,
-  FolderDot,
-};
-
-function CategoryIcon({
-  icon,
-  className,
-  style,
-}: {
-  icon?: string;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const Icon = (icon && ICON_MAP[icon]) || Folder;
-  return <Icon className={className} style={style} strokeWidth={1.75} />;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
 const Categories: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
+  const navigate = useNavigate();
 
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
@@ -91,7 +46,13 @@ const Categories: React.FC = () => {
     null,
   );
 
-  // Modals
+  const [selectedList, setSelectedList] = useState<List | null>(null);
+  const [editingListId, setEditingListId] = useState<number | null>(null);
+  const [categoryIdForList, setCategoryIdForList] = useState<number | null>(
+    null,
+  );
+  const [deletingListId, setDeletingListId] = useState<number | null>(null);
+
   const { isOpen, open, close } = useModal();
   const {
     isOpen: isDeleteOpen,
@@ -104,7 +65,18 @@ const Categories: React.FC = () => {
     close: closeUpdate,
   } = useModal();
 
-  // ── Data fetching ────────────────────────────────────────────────────────
+  const { isOpen: isOpenList, open: openList, close: closeList } = useModal();
+  const {
+    isOpen: isDeleteOpenList,
+    open: openDeleteList,
+    close: closeDeleteList,
+  } = useModal();
+  const {
+    isOpen: isUpdateOpenList,
+    open: openUpdateList,
+    close: closeUpdateList,
+  } = useModal();
+
   const fetchCategories = async () => {
     setLoading(true);
     try {
@@ -120,8 +92,8 @@ const Categories: React.FC = () => {
   useEffect(() => {
     fetchCategories();
   }, [spaceId]);
+  // ── Category handlers ─────────────────────────────────────────────────────
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleCreate = async (data: CreateCategoryFormData) => {
     await callCreateCategory(data, Number(spaceId));
     await fetchCategories();
@@ -156,6 +128,48 @@ const Categories: React.FC = () => {
     } finally {
       setDeletingId(null);
       setSelectedCategory(null);
+    }
+  };
+
+  const handleCreateList = async (data: any) => {
+    if (!categoryIdForList) return;
+    await callCreateList(data, categoryIdForList);
+    await fetchCategories();
+  };
+
+  const handleUpdateList = async (id: number, data: any) => {
+    await callUpdateList(id, data);
+    await fetchCategories();
+  };
+
+  const handleNewListClick = (categoryId: number) => {
+    setCategoryIdForList(categoryId);
+    openList();
+  };
+
+  const handleEditListClick = (list: List) => {
+    setEditingListId(list.id);
+    openUpdateList();
+  };
+
+  const handleDeleteListClick = (list: List) => {
+    setSelectedList(list);
+    openDeleteList();
+  };
+
+  const handleDeleteListConfirm = async () => {
+    if (!selectedList) return;
+    setDeletingListId(selectedList.id);
+    try {
+      await callDeleteList(selectedList.id);
+      toastSuccess("List deleted successfully!");
+      await fetchCategories();
+      closeDeleteList();
+    } catch (err: any) {
+      toastError(err.message ?? "Failed to delete list.");
+    } finally {
+      setDeletingListId(null);
+      setSelectedList(null);
     }
   };
 
@@ -264,7 +278,7 @@ const Categories: React.FC = () => {
                         color: category.color ?? "#78716c",
                       }}
                     >
-                      <CategoryIcon
+                      <Icon
                         icon={category.icon}
                         className="w-5 h-5"
                         style={{ color: category.color ?? "#78716c" }}
@@ -286,71 +300,108 @@ const Categories: React.FC = () => {
           )}
         </div>
 
-        {/* Expanded category detail panel — mimics the old folder drill-down */}
+        {/* Expanded category detail panel */}
         {activeCategory &&
           (() => {
             const cat = categories.find((c) => c.id === activeCategory);
             if (!cat) return null;
+            const catLists = cat.lists ?? [];
             return (
               <div className="p-6 border-b border-slate-50 bg-slate-50/50">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-[14px] text-primary">
-                    subdirectory_arrow_right
-                  </span>
-                  <p className="text-[0.6875rem] font-bold text-primary uppercase tracking-wider">
-                    {cat.name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 p-2.5 hover:bg-white rounded-lg transition-colors cursor-pointer group">
-                  <div
-                    className="w-8 h-8 flex items-center justify-center rounded flex-shrink-0"
-                    style={{
-                      backgroundColor: cat.color ? `${cat.color}18` : "#f5f5f4",
-                      color: cat.color ?? "#78716c",
-                    }}
-                  >
-                    <CategoryIcon
-                      icon={cat.icon}
-                      className="w-4 h-4"
-                      style={{ color: cat.color ?? "#78716c" }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[0.6875rem] font-bold text-on-surface">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[14px] text-primary">
+                      subdirectory_arrow_right
+                    </span>
+                    <p className="text-[0.6875rem] font-bold text-primary uppercase tracking-wider">
                       {cat.name}
                     </p>
-                    <p className="text-[0.625rem] text-on-surface-variant uppercase">
-                      {cat.description || "No description provided."}
-                    </p>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleEditClick(cat);
+                        handleNewListClick(cat.id);
                       }}
-                      className="p-1 hover:bg-slate-100 rounded"
-                      title="Edit"
+                      className="flex items-center gap-1.5 text-[0.6875rem] font-bold text-on-surface-variant hover:text-primary px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
                     >
-                      <Pencil className="w-3.5 h-3.5 text-outline" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(cat);
-                      }}
-                      className="p-1 hover:bg-red-50 rounded"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-error" />
+                      <span className="material-symbols-outlined text-[14px]">
+                        add
+                      </span>
+                      New List
                     </button>
                   </div>
                 </div>
+
+                {catLists.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 gap-2 text-on-surface-variant">
+                    <span
+                      className="material-symbols-outlined text-3xl text-outline"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      list
+                    </span>
+                    <p className="text-xs">No lists in this category yet.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {catLists.map((list: List) => {
+                      const listMenuActions: MenuAction[] = [
+                        {
+                          label: "Edit",
+                          icon: <Pencil className="w-4 h-4" />,
+                          onClick: () => handleEditListClick(list),
+                        },
+                        {
+                          label: "Delete",
+                          icon: <Trash2 className="w-4 h-4" />,
+                          onClick: () => handleDeleteListClick(list),
+                          variant: "danger",
+                        },
+                      ];
+
+                      return (
+                        <div
+                          key={list.id}
+                          onClick={() =>
+                            navigate(`${cat.id}/${list.id}`, {
+                              state: { categoryId: cat.id },
+                            })
+                          }
+                          className="flex items-center gap-5 p-2.5 hover:bg-white rounded-lg transition-colors cursor-pointer group relative"
+                        >
+                          <Icon
+                            icon={list.icon}
+                            style={{ color: list.color ?? "#78716c" }}
+                            size={20}
+                          />
+                          <div className="flex-1 min-w-0 pr-8">
+                            <p className="text-[0.6875rem] font-bold text-on-surface truncate">
+                              {list.name}
+                            </p>
+                            {list.description && (
+                              <p className="text-[0.625rem] text-on-surface-variant truncate uppercase">
+                                {list.description}
+                              </p>
+                            )}
+                          </div>
+                          {/* EllipsisMenu on hover */}
+                          <div className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <EllipsisMenu
+                              actions={listMenuActions}
+                              align="right"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })()}
 
-        {/* Recently added — mirrors the old "Recently Modified" section */}
+        {/* Recently Modified */}
         <div className="p-6">
           <p className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider mb-4">
             Recently Modified
@@ -392,7 +443,7 @@ const Categories: React.FC = () => {
                         color: cat.color ?? "#78716c",
                       }}
                     >
-                      <CategoryIcon
+                      <Icon
                         icon={cat.icon}
                         className="w-4 h-4"
                         style={{ color: cat.color ?? "#78716c" }}
@@ -423,7 +474,7 @@ const Categories: React.FC = () => {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* ── Category Modals ── */}
       <CreateCategoryModal
         isOpen={isOpen}
         onClose={close}
@@ -447,6 +498,38 @@ const Categories: React.FC = () => {
         loading={deletingId !== null}
         title="Delete category"
         description={`Are you sure you want to delete "${selectedCategory?.name}"? This action cannot be undone.`}
+      />
+
+      {/* ── List Modals ── */}
+      <CreateListModal
+        isOpen={isOpenList}
+        onClose={() => {
+          closeList();
+          setCategoryIdForList(null);
+        }}
+        onSubmit={handleCreateList}
+      />
+
+      <UpdateListModal
+        isOpen={isUpdateOpenList}
+        listId={editingListId}
+        onClose={() => {
+          closeUpdateList();
+          setEditingListId(null);
+        }}
+        onSubmit={handleUpdateList}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteOpenList}
+        onClose={() => {
+          closeDeleteList();
+          setSelectedList(null);
+        }}
+        onConfirm={handleDeleteListConfirm}
+        loading={deletingListId !== null}
+        title="Delete list"
+        description={`Are you sure you want to delete "${selectedList?.name}"? This action cannot be undone.`}
       />
     </div>
   );

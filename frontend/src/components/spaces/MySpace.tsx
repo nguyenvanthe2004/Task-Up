@@ -240,7 +240,7 @@ const MySpace: React.FC = () => {
           </button>
           <button
             onClick={() =>
-              navigate(`${space.id}/overview`, { state: { spaceId: space.id } })
+              navigate(`${space.id}`, { state: { spaceId: space.id } })
             }
             className="text-primary text-sm font-bold hover:underline"
           >

@@ -3,6 +3,8 @@ import Workspace from "./Workspace";
 import UserWorkspace from "./UserWorkspace";
 import Space from "./Space";
 import UserSpace from "./UserSpace";
+import Category from "./Category";
+import List from "./List";
 
 const initModels = () => {
   User.belongsToMany(Workspace, {
@@ -84,7 +86,27 @@ const initModels = () => {
     foreignKey: "userId",
     as: "user",
   });
+
+  Space.hasMany(Category, {
+    foreignKey: "spaceId",
+    as: "categories",
+  });
+
+  Category.belongsTo(Space, {
+    foreignKey: "spaceId",
+    as: "space",
+  });
+
+  Category.hasMany(List, {
+    foreignKey: "categoryId",
+    as: "lists",
+  });
+
+  List.belongsTo(Category, {
+    foreignKey: "categoryId",
+    as: "category",
+  });
 };
 
-export { User, Workspace, UserWorkspace, Space, UserSpace };
+export { User, Workspace, UserWorkspace, Space, UserSpace, Category, List };
 export default initModels;

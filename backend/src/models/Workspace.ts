@@ -1,6 +1,7 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/db";
 import User from "./User";
+import Space from "./Space";
 
 interface WorkspaceAttributes {
   id: number;
@@ -29,6 +30,7 @@ export class Workspace
   declare color: string;
   declare ownerId: number;
   declare readonly Users?: User[];
+  declare readonly Space?: Space;
 
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;

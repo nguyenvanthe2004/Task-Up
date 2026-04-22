@@ -1,4 +1,5 @@
 import { Dayjs } from "dayjs";
+import { CLOUDINARY_URL } from "../constants";
 
 export function buildCells(d: Dayjs) {
   const firstDay = d.date(1).day();
@@ -17,4 +18,12 @@ export function buildCells(d: Dayjs) {
   const tail = (7 - (cells.length % 7)) % 7;
   for (let i = 1; i <= tail; i++) cells.push({ day: i, cur: false });
   return cells;
+}
+
+export function normalizeImg(url?: string) {
+  return url
+    ? url.startsWith("https")
+      ? url
+      : `${CLOUDINARY_URL}${url}`
+    : "/images/avatar.png";
 }

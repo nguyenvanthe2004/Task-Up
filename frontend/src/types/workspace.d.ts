@@ -17,6 +17,7 @@ export interface UserWorkspace {
     email: string;
     fullName: string;
   };
+  userId: number;
   workspaces?: Workspace[];
 }
 
