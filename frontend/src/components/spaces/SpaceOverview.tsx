@@ -33,8 +33,6 @@ const SpaceOverview: React.FC = () => {
     fetchSpaceDetails();
   }, [spaceId]);
 
-  console.log(space);
-
   const VIEW_TABS: { key: SpaceView; icon: string; label: string }[] = [
     { key: "overview", icon: "grid_view", label: "Overview" },
     { key: "list", icon: "format_list_bulleted", label: "List" },
@@ -93,7 +91,7 @@ const SpaceOverview: React.FC = () => {
 
             {/* Avatars */}
             <div
-              onClick={() => navigate("")}
+              onClick={() => navigate("members")}
               className="flex -space-x-2 pt-4 cursor-pointer"
             >
               <AvatarStack members={space?.members || []} />

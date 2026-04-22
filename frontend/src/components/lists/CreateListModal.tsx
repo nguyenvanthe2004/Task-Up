@@ -3,44 +3,41 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  FolderKanban,
-  LayoutDashboard,
-  Code2,
-  Megaphone,
-  FlaskConical,
-  FileText,
-  Globe,
-  ShieldCheck,
-  Layers,
-  MonitorPlay,
-  Database,
-  PenTool,
-  Inbox,
-  BookMarked,
-  Telescope,
+  List,
+  ListChecks,
+  ListOrdered,
+  ListTodo,
+  ListTree,
+  ListFilter,
+  ListVideo,
+  ListMusic,
+  ListCollapse,
+  ListEnd,
+  ListMinus,
+  ListPlus,
+  ListRestart,
+  ListStart,
+  ListX,
 } from "lucide-react";
-import {
-  CreateSpaceFormData,
-  CreateSpaceSchema,
-} from "../../validations/space";
+import { CreateListFormData, CreateListSchema } from "../../validations/list";
 import { toastError, toastSuccess } from "../../lib/toast";
 
 const ICONS = [
-  { icon: FolderKanban, label: "FolderKanban" },
-  { icon: LayoutDashboard, label: "LayoutDashboard" },
-  { icon: Code2, label: "Code2" },
-  { icon: Megaphone, label: "Megaphone" },
-  { icon: FlaskConical, label: "FlaskConical" },
-  { icon: FileText, label: "FileText" },
-  { icon: Globe, label: "Globe" },
-  { icon: ShieldCheck, label: "ShieldCheck" },
-  { icon: Layers, label: "Layers" },
-  { icon: MonitorPlay, label: "MonitorPlay" },
-  { icon: Database, label: "Database" },
-  { icon: PenTool, label: "PenTool" },
-  { icon: Inbox, label: "Inbox" },
-  { icon: BookMarked, label: "BookMarked" },
-  { icon: Telescope, label: "Telescope" },
+  { icon: List, label: "List" },
+  { icon: ListChecks, label: "ListChecks" },
+  { icon: ListOrdered, label: "ListOrdered" },
+  { icon: ListTodo, label: "ListTodo" },
+  { icon: ListTree, label: "ListTree" },
+  { icon: ListFilter, label: "ListFilter" },
+  { icon: ListVideo, label: "ListVideo" },
+  { icon: ListMusic, label: "ListMusic" },
+  { icon: ListCollapse, label: "ListCollapse" },
+  { icon: ListEnd, label: "ListEnd" },
+  { icon: ListMinus, label: "ListMinus" },
+  { icon: ListPlus, label: "ListPlus" },
+  { icon: ListRestart, label: "ListRestart" },
+  { icon: ListStart, label: "ListStart" },
+  { icon: ListX, label: "ListX" },
 ];
 
 const COLORS = [
@@ -54,19 +51,19 @@ const COLORS = [
   { hex: "#64748B", label: "Slate" },
 ];
 
-interface CreateSpaceModalProps {
+interface CreateListModalProps {
   isOpen: boolean;
   isLoading?: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateSpaceFormData) => Promise<void>;
+  onSubmit: (data: CreateListFormData) => Promise<void>;
 }
 
-export default function CreateSpaceModal({
+export default function CreateListModal({
   isOpen,
   isLoading: externalLoading,
   onClose,
   onSubmit,
-}: CreateSpaceModalProps) {
+}: CreateListModalProps) {
   const [iconIdx, setIconIdx] = useState(0);
   const [selectedColor, setSelectedColor] = useState(COLORS[0].hex);
   const [internalLoading, setInternalLoading] = useState(false);
@@ -78,13 +75,16 @@ export default function CreateSpaceModal({
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
-  } = useForm<CreateSpaceFormData>({
-    resolver: zodResolver(CreateSpaceSchema),
-    defaultValues: { name: "", description: "" },
+  } = useForm<CreateListFormData>({
+    resolver: zodResolver(CreateListSchema),
+    defaultValues: { name: "", description: "", isPublic: true },
   });
+
   const nameValue = watch("name") ?? "";
   const descValue = watch("description") ?? "";
+  const isPublic = watch("isPublic");
 
   const handleClose = () => {
     if (isLoading) return;
@@ -94,7 +94,7 @@ export default function CreateSpaceModal({
     onClose();
   };
 
-  const onValid = async (data: CreateSpaceFormData) => {
+  const onValid = async (data: CreateListFormData) => {
     try {
       setInternalLoading(true);
       await onSubmit({
@@ -106,7 +106,7 @@ export default function CreateSpaceModal({
       setIconIdx(0);
       setSelectedColor(COLORS[0].hex);
       onClose();
-      toastSuccess("Space created successfully!");
+      toastSuccess("List created successfully!");
     } catch (error: any) {
       toastError(error.message);
     } finally {
@@ -133,7 +133,6 @@ export default function CreateSpaceModal({
         {/* Header */}
         <div className="flex items-start justify-between px-7 pt-6 pb-5 border-b border-neutral-100">
           <div className="flex items-center gap-4">
-            {/* Icon preview — reflects selected color */}
             <div
               className="flex h-12 w-12 items-center justify-center rounded-xl shadow-sm transition-colors duration-300 flex-shrink-0"
               style={{ backgroundColor: `${selectedColor}18` }}
@@ -146,10 +145,10 @@ export default function CreateSpaceModal({
             </div>
             <div>
               <h2 className="text-base font-semibold text-neutral-900 tracking-tight">
-                Create space
+                Create list
               </h2>
               <p className="text-sm text-neutral-400 mt-0.5">
-                Set up a dedicated workspace for your team
+                Add a new list to organize your tasks
               </p>
             </div>
           </div>
@@ -168,12 +167,12 @@ export default function CreateSpaceModal({
           {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-2">
-              Space name <span className="text-red-400">*</span>
+              List name <span className="text-red-400">*</span>
             </label>
             <input
               {...register("name")}
               type="text"
-              placeholder="e.g. Engineering Backend, Design System…"
+              placeholder="e.g. Backlog, Sprint 1, Bug Reports…"
               maxLength={255}
               disabled={isLoading}
               className={`w-full rounded-xl border px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
@@ -209,13 +208,13 @@ export default function CreateSpaceModal({
             </label>
             <textarea
               {...register("description")}
-              placeholder="What is this space for?"
+              placeholder="What is this list for?"
               rows={3}
               maxLength={1000}
               disabled={isLoading}
               className={`w-full rounded-xl border px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
                 ${
-                  errors.name
+                  errors.description
                     ? "border-red-300 ring-1 ring-red-200 focus:border-red-400 focus:ring-red-200"
                     : "border-neutral-200 hover:border-neutral-300 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
                 }`}
@@ -257,10 +256,7 @@ export default function CreateSpaceModal({
                     }`}
                   style={
                     iconIdx === idx
-                      ? {
-                          backgroundColor: `${selectedColor}18`,
-                          color: selectedColor,
-                        }
+                      ? { backgroundColor: `${selectedColor}18`, color: selectedColor }
                       : {}
                   }
                 >
@@ -296,6 +292,57 @@ export default function CreateSpaceModal({
               ))}
             </div>
           </div>
+
+          {/* Visibility toggle */}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-3">
+              Visibility
+            </label>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setValue("isPublic", !isPublic, { shouldValidate: true })}
+              className="w-full flex items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 hover:border-neutral-300 transition-colors disabled:opacity-50"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 transition-colors duration-300"
+                  style={{
+                    backgroundColor: isPublic ? `${selectedColor}18` : "#f5f5f4",
+                    color: isPublic ? selectedColor : "#78716c",
+                  }}
+                >
+                  <span
+                    className="material-symbols-outlined text-[18px]"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    {isPublic ? "public" : "lock"}
+                  </span>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-neutral-900">
+                    {isPublic ? "Public" : "Private"}
+                  </p>
+                  <p className="text-xs text-neutral-400">
+                    {isPublic
+                      ? "Everyone in the space can see this list"
+                      : "Only invited members can access this list"}
+                  </p>
+                </div>
+              </div>
+              {/* Toggle switch */}
+              <div
+                className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 flex-shrink-0 ml-4"
+                style={{ backgroundColor: isPublic ? selectedColor : "#d1d5db" }}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-300 ${
+                    isPublic ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Footer */}
@@ -327,7 +374,7 @@ export default function CreateSpaceModal({
               ) : (
                 <>
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Create space
+                  Create list
                 </>
               )}
             </button>

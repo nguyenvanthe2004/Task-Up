@@ -27,21 +27,21 @@ import { callGetSpaceById, callUpdateSpace } from "../../services/space";
 import { toastError, toastSuccess } from "../../lib/toast";
 
 const ICONS = [
-  { icon: FolderKanban, label: "Kanban" },
-  { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: Code2, label: "Code" },
-  { icon: Megaphone, label: "Campaign" },
-  { icon: FlaskConical, label: "Research" },
-  { icon: FileText, label: "Docs" },
-  { icon: Globe, label: "Web" },
-  { icon: ShieldCheck, label: "Security" },
+  { icon: FolderKanban, label: "FolderKanban" },
+  { icon: LayoutDashboard, label: "LayoutDashboard" },
+  { icon: Code2, label: "Code2" },
+  { icon: Megaphone, label: "Megaphone" },
+  { icon: FlaskConical, label: "FlaskConical" },
+  { icon: FileText, label: "FileText" },
+  { icon: Globe, label: "Globe" },
+  { icon: ShieldCheck, label: "ShieldCheck" },
   { icon: Layers, label: "Layers" },
-  { icon: MonitorPlay, label: "Media" },
-  { icon: Database, label: "Data" },
-  { icon: PenTool, label: "Design" },
+  { icon: MonitorPlay, label: "MonitorPlay" },
+  { icon: Database, label: "Database" },
+  { icon: PenTool, label: "PenTool" },
   { icon: Inbox, label: "Inbox" },
-  { icon: BookMarked, label: "Wiki" },
-  { icon: Telescope, label: "Explore" },
+  { icon: BookMarked, label: "BookMarked" },
+  { icon: Telescope, label: "Telescope" },
 ];
 
 const COLORS = [

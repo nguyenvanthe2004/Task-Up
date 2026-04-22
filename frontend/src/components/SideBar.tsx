@@ -35,6 +35,19 @@ import { Workspace } from "../types/workspace";
 import { RootState } from "../redux/store";
 import { useDispatch, useSelector } from "react-redux";
 import { addWorkspace } from "../redux/slices/currentUser";
+import { toastError } from "../lib/toast";
+import { callCreateSpace, callGetSpaces } from "../services/space";
+import { Space } from "../types/space";
+import CreateSpaceModal from "./spaces/CreateSpaceModal";
+import { useModal } from "../hook/useModal";
+import { CreateSpaceFormData } from "../validations/space";
+import { CreateCategoryFormData } from "../validations/category";
+import { callCreateCategory } from "../services/category";
+import { CreateListFormData } from "../validations/list";
+import { callCreateList } from "../services/list";
+import CreateCategoryModal from "./categories/CreateCategoryModal";
+import CreateListModal from "./lists/CreateListModal";
+import { Icon } from "./ui/Icon";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Rocket,
@@ -100,23 +113,6 @@ const bottomItems = [
   { label: "Help", icon: <HelpCircle size={18} />, path: "/help" },
 ];
 
-const spacesData = [
-  {
-    name: "Marketing",
-    categories: [
-      { name: "Website", projects: ["Landing Page", "Blog Page"] },
-      { name: "SEO", projects: ["Keyword Research", "Backlink"] },
-    ],
-  },
-  {
-    name: "Development",
-    categories: [
-      { name: "Frontend", projects: ["React App", "Admin Dashboard"] },
-      { name: "Backend", projects: ["API Server", "Auth Service"] },
-    ],
-  },
-];
-
 const slug = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
 
 const SideBar: React.FC = () => {
@@ -128,10 +124,25 @@ const SideBar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(false);
-  const [openSpaces, setOpenSpaces] = useState(false);
+  const [openSpaces, setOpenSpaces] = useState(true);
   const [openSpacesList, setOpenSpacesList] = useState<number[]>([]);
   const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
   const dispatch = useDispatch();
+
+  const { isOpen: isOpenSpace, open: openSpace, close } = useModal();
+
+  const {
+    isOpen: isOpenCategory,
+    open: openCategory,
+    close: closeCategory,
+  } = useModal();
+
+  const { isOpen: isOpenList, open: openList, close: closeList } = useModal();
 
   const user = useSelector((state: RootState) => state.auth.currentUser);
 
@@ -145,6 +156,36 @@ const SideBar: React.FC = () => {
     if (!workspaceId) return false;
     if (path === "/") return pathname === `/${workspaceId}`;
     return pathname.startsWith(`/${workspaceId}${path}`);
+  };
+
+  const fetchSpaces = async () => {
+    try {
+      const res = await callGetSpaces(Number(workspaceId));
+      setSpaces(res.data);
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSpaces();
+  }, [workspaceId]);
+
+  const handleCreateSpace = async (data: CreateSpaceFormData) => {
+    await callCreateSpace(data, Number(workspaceId));
+    await fetchSpaces();
+  };
+
+  const handleCreateCategory = async (data: CreateCategoryFormData) => {
+    await callCreateCategory(data, Number(selectedSpaceId));
+    await fetchSpaces();
+  };
+
+  const handleCreateList = async (data: CreateListFormData) => {
+    await callCreateList(data, Number(selectedCategoryId));
+    await fetchSpaces();
   };
 
   const isSpacePath = (spaceName: string) =>
@@ -162,20 +203,11 @@ const SideBar: React.FC = () => {
     setIsOpen(false);
   };
 
-  const navigateToSpace = (spaceName: string) =>
-    navigate(`/${workspaceId}/spaces/${slug(spaceName)}`);
+  const navigateToSpace = (spaceId: number) =>
+    navigate(`/${workspaceId}/spaces/${spaceId}`);
 
-  const navigateToCategory = (spaceName: string, catName: string) =>
-    navigate(`/${workspaceId}/spaces/${slug(spaceName)}/${slug(catName)}`);
-
-  const navigateToProject = (
-    spaceName: string,
-    catName: string,
-    project: string,
-  ) => {
-    navigate(
-      `/${workspaceId}/spaces/${slug(spaceName)}/${slug(catName)}/${slug(project)}`,
-    );
+  const navigateToList = (spaceId: number, catId: number, listId: number) => {
+    navigate(`/${workspaceId}/spaces/${spaceId}/${catId}/${listId}`);
     setIsOpen(false);
   };
 
@@ -210,13 +242,14 @@ const SideBar: React.FC = () => {
   }, []);
 
   const renderSpacesTree = () => (
-    <div className="mt-0.5 space-y-0.5">
-      {spacesData.map((space, spaceIdx) => {
+    <div className="ml-1 mt-0.5 space-y-0.5">
+      {spaces.map((space, spaceIdx) => {
         const isSpaceOpen = openSpacesList.includes(spaceIdx);
         const spaceActive = isSpacePath(space.name);
 
         return (
-          <div key={space.name}>
+          <div key={space.id}>
+            {" "}
             <div className="flex items-center group">
               <button
                 className="flex items-center justify-center w-6 h-8 flex-shrink-0 rounded hover:bg-slate-200/60 transition-colors"
@@ -228,22 +261,22 @@ const SideBar: React.FC = () => {
                 />
               </button>
               <button
-                className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium min-w-0 transition-all duration-150 ${
+                className={`flex-1 flex items-center gap-2 px-1 rounded-lg text-sm font-medium min-w-0 transition-all duration-150 ${
                   spaceActive
                     ? "bg-indigo-50 text-indigo-700"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                 }`}
-                onClick={() => navigateToSpace(space.name)}
+                onClick={() => navigateToSpace(Number(space.id))}
               >
-                <Folder
-                  size={14}
-                  className={`flex-shrink-0 ${spaceActive ? "text-indigo-500" : "text-slate-400"}`}
-                />
                 <span className="truncate">{space.name}</span>
               </button>
               <button
                 className="opacity-0 group-hover:opacity-100 ml-0.5 p-1 rounded hover:bg-slate-200/60 transition-all flex-shrink-0"
-                onClick={() => console.log("Create category in", space.name)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSpaceId(space.id);
+                  openCategory();
+                }}
               >
                 <Plus
                   size={12}
@@ -251,16 +284,16 @@ const SideBar: React.FC = () => {
                 />
               </button>
             </div>
-
             {isSpaceOpen && (
-              <div className="ml-5 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
+              <div className="ml-1 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
                 {space.categories.map((cat, catIdx) => {
                   const catKey = `${spaceIdx}-${catIdx}`;
                   const isCatOpen = openCategories.includes(catKey);
                   const catActive = isCategoryPath(space.name, cat.name);
 
                   return (
-                    <div key={cat.name}>
+                    <div key={cat.id}>
+                      {" "}
                       <div className="flex items-center group">
                         <button
                           className="flex items-center justify-center w-5 h-7 flex-shrink-0 rounded hover:bg-slate-200/60 transition-colors"
@@ -277,17 +310,17 @@ const SideBar: React.FC = () => {
                               ? "bg-indigo-50/70 text-indigo-600"
                               : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                           }`}
-                          onClick={() =>
-                            navigateToCategory(space.name, cat.name)
-                          }
+                          onClick={() => navigateToSpace(space.id)}
                         >
                           <span className="truncate">{cat.name}</span>
                         </button>
                         <button
                           className="opacity-0 group-hover:opacity-100 ml-0.5 p-0.5 rounded hover:bg-slate-200/60 transition-all flex-shrink-0"
-                          onClick={() =>
-                            console.log("Create project in", cat.name)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCategoryId(cat.id);
+                            openList();
+                          }}
                         >
                           <Plus
                             size={11}
@@ -295,36 +328,27 @@ const SideBar: React.FC = () => {
                           />
                         </button>
                       </div>
-
                       {isCatOpen && (
                         <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-100 pl-2">
-                          {cat.projects.map((project) => {
-                            const projectActive = isProjectPath(
+                          {cat.lists.map((list) => {
+                            const listActive = isProjectPath(
                               space.name,
                               cat.name,
-                              project,
+                              list.name,
                             );
                             return (
                               <button
-                                key={project}
+                                key={list.id}
                                 onClick={() =>
-                                  navigateToProject(
-                                    space.name,
-                                    cat.name,
-                                    project,
-                                  )
+                                  navigateToList(space.id, cat.id, list.id)
                                 }
                                 className={`w-full flex items-center gap-1.5 px-1.5 py-1.5 rounded-md text-[12.5px] transition-all duration-150 ${
-                                  projectActive
+                                  listActive
                                     ? "bg-indigo-50 text-indigo-600 font-medium"
                                     : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                                 }`}
                               >
-                                <File
-                                  size={11}
-                                  className={`flex-shrink-0 ${projectActive ? "text-indigo-400" : "text-slate-300"}`}
-                                />
-                                <span className="truncate">{project}</span>
+                                <span className="truncate">{list.name}</span>
                               </button>
                             );
                           })}
@@ -366,9 +390,30 @@ const SideBar: React.FC = () => {
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-indigo-600 rounded-r-full" />
             )}
             <span
-              className={`transition-colors ${active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}
+              className={`transition-colors relative w-4 h-4 ${active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}
             >
-              {item.icon}
+              <span
+                className={`absolute inset-0 transition-all duration-200 ${
+                  isSpace
+                    ? "opacity-100 group-hover:opacity-0 group-hover:scale-75"
+                    : ""
+                }`}
+              >
+                {item.icon}
+              </span>
+
+              {isSpace && (
+                <span className="absolute inset-0 transition-all duration-200 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100">
+                  <ChevronDown
+                    size={16}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenSpaces((prev) => !prev);
+                    }}
+                    className={`transition-transform duration-200 ${openSpaces ? "rotate-180" : ""}`}
+                  />
+                </span>
+              )}
             </span>
             <span>{item.label}</span>
           </div>
@@ -379,17 +424,9 @@ const SideBar: React.FC = () => {
                 size={16}
                 onClick={(e) => {
                   e.stopPropagation();
-                  console.log("Create Space");
+                  openSpace();
                 }}
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
-              />
-              <ChevronDown
-                size={16}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenSpaces((prev) => !prev);
-                }}
-                className={`transition-transform duration-200 ${openSpaces ? "rotate-180" : ""}`}
               />
             </div>
           )}
@@ -696,6 +733,21 @@ const SideBar: React.FC = () => {
           ))}
         </div>
       </aside>
+      <CreateSpaceModal
+        isOpen={isOpenSpace}
+        onClose={close}
+        onSubmit={handleCreateSpace}
+      />
+      <CreateCategoryModal
+        isOpen={isOpenCategory}
+        onClose={closeCategory}
+        onSubmit={handleCreateCategory}
+      />
+      <CreateListModal
+        isOpen={isOpenList}
+        onClose={closeList}
+        onSubmit={handleCreateList}
+      />
     </>
   );
 };

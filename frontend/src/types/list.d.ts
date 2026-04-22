@@ -1,28 +1,25 @@
-import { List } from "./list";
-import { Space } from "./space";
-
-export interface CreateCategory {
+export interface CreateList {
   name: string;
   description: string;
   icon?: string;
   color?: string;
+  isPublic?: boolean;
 }
 
-export interface UpdateCategory {
+export interface UpdateList {
   name?: string;
   description?: string;
   icon?: string;
   color?: string;
+  isPublic?: boolean;
 }
 
-
-export interface Category {
+export interface List {
   id: number;
   name: string;
   description: string;
   icon: string;
   color: string;
-  spaceId: number;
+  isPublic: boolean;
   createdAt: Date;
-  lists: List[];
 }

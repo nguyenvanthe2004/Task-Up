@@ -1,6 +1,7 @@
 import { Service } from "typedi";
 import { Category } from "../models/Category";
 import { CreateCategoryInput, UpdateCategoryInput } from "../types/category";
+import { List, Space } from "../models";
 
 @Service()
 export class CategoryRepository {
@@ -12,6 +13,13 @@ export class CategoryRepository {
     const whereClause = spaceId !== undefined ? { spaceId } : {};
     return await Category.findAll({
       where: whereClause,
+      include: [
+        {
+          model: List,
+          as: "lists",
+          attributes: ["id", "name", "description", "icon", "color"],
+        },
+      ],
     });
   }
 

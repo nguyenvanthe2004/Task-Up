@@ -7,6 +7,7 @@ import { logout } from "../redux/slices/currentUser";
 import { callLogout } from "../services/auth";
 import { toastError } from "../lib/toast";
 import { CLOUDINARY_URL } from "../constants";
+import { normalizeImg } from "../lib/until";
 
 const icons = [
   { key: "notifications", icon: Bell, path: "/notifications" },
@@ -130,11 +131,7 @@ const Header: React.FC = () => {
                 alt="User Profile"
                 className="w-8 h-8 rounded-full ring-2 ring-indigo-100 cursor-pointer flex-shrink-0 hover:ring-indigo-300 transition-all"
                 src={
-                  user?.avatar
-                    ? user.avatar.startsWith("https")
-                      ? user.avatar
-                      : `${CLOUDINARY_URL}${user.avatar}`
-                    : "/images/avatar.png"
+                  normalizeImg(user?.avatar)
                 }
               />
             </button>
