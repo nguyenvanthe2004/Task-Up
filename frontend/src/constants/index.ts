@@ -13,6 +13,13 @@ export enum WorkspaceRole {
   MEMBER = "member",
 }
 
+export enum PriorityStatus {
+  LOW = "low",
+  NORMAL = "normal",
+  HIGH = "high",
+  URGENT = "urgent",
+}
+
 export const priorityBadge: Record<string, string> = {
   High: "bg-red-50 text-red-700",
   Medium: "bg-amber-50 text-amber-700",

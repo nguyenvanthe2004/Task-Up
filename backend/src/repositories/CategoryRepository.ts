@@ -1,7 +1,7 @@
 import { Service } from "typedi";
 import { Category } from "../models/Category";
 import { CreateCategoryInput, UpdateCategoryInput } from "../types/category";
-import { List, Space } from "../models";
+import { List, Space, Task, User } from "../models";
 
 @Service()
 export class CategoryRepository {
@@ -18,6 +18,30 @@ export class CategoryRepository {
           model: List,
           as: "lists",
           attributes: ["id", "name", "description", "icon", "color"],
+          include: [
+            {
+              model: Task,
+              as: "tasks",
+              attributes: [
+                "id",
+                "name",
+                "description",
+                "priority",
+                "tag",
+                "startDate",
+                "dueDate",
+                "statusId",
+                "listId",
+              ],
+              include: [
+                {
+                  model: User,
+                  as: "assignees",
+                  attributes: ["id", "fullName", "email", "avatar"],
+                },
+              ],
+            },
+          ],
         },
       ],
     });

@@ -1,14 +1,6 @@
 import { PriorityStatus } from "../models/Task";
 import { Status } from "./status";
 
-export type View = "list" | "kanban" | "calendar";
-
-interface Member {
-  id: number;
-  fullName: string;
-  email: string;
-  avatar?: string;
-}
 export interface CreateTask {
   name: string;
   description: string;
@@ -31,29 +23,12 @@ export interface UpdateTask {
 }
 
 export interface Task {
-  id: number;
   name: string;
-  description?: string;
-  priority?: string;
-  statusId: number;         
-  dueDate?: string;
-  startDate?: string;
+  description: string;
+  priority?: PriorityStatus;
   tag?: string;
-  listId?: number;
-  assignees?: AvatarMember[];
+  startDate?: string;
+  dueDate?: string;
   status: Status[];
-  list: {
-    id: number;
-    name: string;
-    category: {
-      id: number;
-      name: string;
-      space: {
-        id: number;
-        name: string;
-      }
-    }
-  }
-  createdAt?: string;
-  updatedAt?: string;
+  assignees?: number[];
 }

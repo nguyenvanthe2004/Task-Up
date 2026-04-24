@@ -7,7 +7,7 @@ type ExtendedProps<T> = CustomTableProps<T> & {
   showCheckbox?: boolean;
 };
 
-const CustomTable = <T extends { _id: string }>({
+const CustomTable = <T extends { id: number }>({
   data,
   columns,
   loading = false,
@@ -90,7 +90,7 @@ const CustomTable = <T extends { _id: string }>({
         ) : (
           data.map((row) => (
             <div
-              key={row._id}
+              key={row.id}
               className="grid items-center px-6 py-4 hover:bg-surface-bright transition-colors border-b border-slate-50 group"
               style={{ gridTemplateColumns: gridCols }}
             >

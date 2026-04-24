@@ -1,6 +1,6 @@
 import type React from "react";
 import HomeLayout from "../../layouts/HomeLayout";
-import MyTask from "../../components/tasks/MyTask";
+import MyTask from "../../components/mytask/MyTask";
 
 
 const MyTaskPage: React.FC = () => {

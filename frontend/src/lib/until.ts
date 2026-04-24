@@ -1,4 +1,4 @@
-import { Dayjs } from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { CLOUDINARY_URL } from "../constants";
 
 export function buildCells(d: Dayjs) {
@@ -27,3 +27,22 @@ export function normalizeImg(url?: string) {
       : `${CLOUDINARY_URL}${url}`
     : "/images/avatar.png";
 }
+
+export const fmtDate = (iso?: string) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+export const toISO = (val?: string) => {
+  if (!val) return undefined;
+
+  const d = dayjs(val);
+
+  if (!d.isValid()) return undefined;
+
+  return d.toISOString();
+};

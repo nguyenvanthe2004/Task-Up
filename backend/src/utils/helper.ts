@@ -43,6 +43,11 @@ export const verifyInviteToken = (token: string) => {
   }
 };
 
+export const toDate = (dateStr?: string) => {
+  if (!dateStr) return undefined;
+  return new Date(dateStr);
+}
+
 export const refreshToken = (res: Response, user: User) => {
   const token = jwt.sign(
     {

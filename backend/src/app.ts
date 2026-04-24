@@ -21,6 +21,8 @@ import initModels from "./models";
 import { SpaceController } from "./controllers/SpaceController";
 import { CategoryController } from "./controllers/CategoryController";
 import { ListController } from "./controllers/ListController";
+import { StatusController } from "./controllers/StatusController";
+import { TaskController } from "./controllers/TaskController";
 
 dotenv.config();
 
@@ -42,7 +44,7 @@ export const startServer = async () => {
     app.use(mongooseSerializer);
 
     useExpressServer(app, {
-      controllers: [UserController, FileController, WorkspaceController, SpaceController, CategoryController, ListController],
+      controllers: [UserController, FileController, WorkspaceController, SpaceController, CategoryController, ListController, TaskController, StatusController],
 
       middlewares: [ErrorHandler, AuthMiddleware],
 
