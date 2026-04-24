@@ -19,7 +19,6 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-/* ─── Animated counter ─── */
 const Counter: React.FC<{ to: number; suffix?: string }> = ({ to, suffix = "" }) => {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
@@ -44,7 +43,6 @@ const Counter: React.FC<{ to: number; suffix?: string }> = ({ to, suffix = "" })
   return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
 };
 
-/* ─── Fake task card ─── */
 const TaskCard: React.FC<{
   title: string;
   tag: string;
@@ -100,7 +98,6 @@ const TaskCard: React.FC<{
   );
 };
 
-/* ─── Feature card ─── */
 const FeatureCard: React.FC<{
   icon: React.ReactNode;
   title: string;
