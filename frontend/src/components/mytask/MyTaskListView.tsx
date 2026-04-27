@@ -13,12 +13,13 @@ import { callGetStatuses } from "../../services/status";
 import { toastError, toastSuccess } from "../../lib/toast";
 import { AvatarStack } from "../ui/AvatarStack";
 import { fmtDate } from "../../lib/until";
-import { GRID_COLS } from "../tasks/InlineCreateRow";
-import BulkStatusModal from "../tasks/BulkStatusModal";
+
 import DetailTask from "../tasks/DetailTask";
 import NotFound from "../ui/NotFound";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { GRID_COLS } from "../tools/InlineCreateRow";
+import BulkStatusModal from "../tools/BulkStatusModal";
 
 interface StatusGroup {
   status: Status;
@@ -424,6 +425,7 @@ const MyTaskListView: React.FC = () => {
       {selected && (
         <DetailTask
           task={selected}
+          statuses={statuses}
           onClose={() => setSelected(null)}
           onUpdate={(data: UpdateTask) =>
             handleUpdateStatus(selected.id, (data as any).statusId)

@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Task } from "../../types/task";
-import KanbanBoard from "../tasks/KanbanBoard";
-import CalendarView from "../tasks/CalendarView";
 import DetailTask from "../tasks/DetailTask";
 import Categories from "../categories/Categories";
 import { Space } from "../../types/space";
@@ -10,18 +8,27 @@ import { toastError } from "../../lib/toast";
 import { callGetSpaceById } from "../../services/space";
 import { AvatarStack } from "../ui/AvatarStack";
 import SpaceListView from "./SpaceListView";
+import SpaceBoardView from "./SpaceBoardView";
+import SpaceCalendarView from "./SpaceCalendarView";
+import { Workspace } from "../../types/workspace";
+import { RootState } from "../../redux/store";
+import { useSelector } from "react-redux";
 
 type SpaceView = "overview" | "list" | "kanban" | "calendar";
 
 const SpaceOverview: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
+  const { workspaceId } = useParams();
+  const [searchParams] = useSearchParams();
+  const modeView = searchParams.get("mode");
   const [view, setView] = useState<SpaceView>("overview");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const navigate = useNavigate();
   const [space, setSpace] = useState<Space | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
-  const importRef = useRef<HTMLInputElement>(null);
+
+  const onClick = (mode: SpaceView) => {
+    navigate(`/${workspaceId}/spaces/${spaceId}?mode=${mode}`);
+  };
 
   const fetchSpaceDetails = async () => {
     try {
@@ -34,31 +41,8 @@ const SpaceOverview: React.FC = () => {
 
   useEffect(() => {
     fetchSpaceDetails();
-  }, [spaceId]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setExportOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // TODO: handle import logic
-    console.log("Importing file:", file.name);
-    e.target.value = "";
-  };
-
-  const handleExport = (format: "csv" | "json" | "xlsx") => {
-    // TODO: handle export logic per format
-    console.log("Exporting as:", format);
-    setExportOpen(false);
-  };
+    !modeView ? setView("overview") : setView(modeView as SpaceView);
+  }, [spaceId, modeView]);
 
   const VIEW_TABS: { key: SpaceView; icon: string; label: string }[] = [
     { key: "overview", icon: "grid_view", label: "Overview" },
@@ -75,7 +59,7 @@ const SpaceOverview: React.FC = () => {
           <div>
             <nav className="flex items-center gap-2 mb-2">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/${workspaceId}/spaces`)}
                 className="text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors"
               >
                 Spaces
@@ -101,7 +85,7 @@ const SpaceOverview: React.FC = () => {
               {VIEW_TABS.map(({ key, icon, label }) => (
                 <button
                   key={key}
-                  onClick={() => setView(key)}
+                  onClick={() => onClick(key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     view === key
                       ? "bg-white text-indigo-600 shadow-sm"
@@ -115,95 +99,6 @@ const SpaceOverview: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            {/* ── Import button ── */}
-            <input
-              ref={importRef}
-              type="file"
-              accept=".csv,.json,.xlsx"
-              className="hidden"
-              onChange={handleImport}
-            />
-            <button
-              onClick={() => importRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-200 text-stone-600 hover:bg-stone-50 hover:border-stone-300 transition-all"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M8 2v8M4 7l4 4 4-4" />
-                <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" />
-              </svg>
-              Import
-            </button>
-
-            {/* ── Export dropdown ── */}
-            <div ref={exportRef} className="relative">
-              <button
-                onClick={() => setExportOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-200 text-stone-600 hover:bg-stone-50 hover:border-stone-300 transition-all"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M8 10V2M4 5l4-4 4 4" />
-                  <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" />
-                </svg>
-                Export
-                <svg
-                  viewBox="0 0 16 16"
-                  className={`w-3 h-3 transition-transform ${exportOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 6l4 4 4-4" />
-                </svg>
-              </button>
-
-              {exportOpen && (
-                <div className="absolute right-0 mt-1.5 w-40 bg-white border border-stone-200 rounded-xl shadow-lg shadow-stone-100 overflow-hidden z-20">
-                  <div className="px-3 py-2 border-b border-stone-100">
-                    <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-                      Export as
-                    </p>
-                  </div>
-                  {(
-                    [
-                      { format: "csv", label: "CSV", ext: ".csv" },
-                      { format: "xlsx", label: "Excel", ext: ".xlsx" },
-                      { format: "json", label: "JSON", ext: ".json" },
-                    ] as const
-                  ).map(({ format, label, ext }) => (
-                    <button
-                      key={format}
-                      onClick={() => handleExport(format)}
-                      className="flex items-center justify-between w-full px-3 py-2 text-[13px] font-medium text-stone-600 hover:bg-stone-50 transition-colors"
-                    >
-                      <span>{label}</span>
-                      <span className="text-[11px] text-stone-400 font-mono">
-                        {ext}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Avatars */}
             <div
               onClick={() => navigate("members")}
@@ -498,8 +393,8 @@ const SpaceOverview: React.FC = () => {
         )}
 
         {view === "list" && <SpaceListView />}
-        {view === "kanban" && <KanbanBoard />}
-        {view === "calendar" && <CalendarView />}
+        {view === "kanban" && <SpaceBoardView />}
+        {view === "calendar" && <SpaceCalendarView />}
 
         {(view === "overview" || view === "list") && selectedTask && (
           <DetailTask

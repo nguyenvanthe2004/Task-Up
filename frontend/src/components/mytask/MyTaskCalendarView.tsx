@@ -1,89 +1,63 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useImperativeHandle,
-  forwardRef,
-} from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import dayjs from "dayjs";
-import { useParams } from "react-router-dom";
-import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
+import { Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
 import { priorityBadge, priorityColor, WEEKDAYS } from "../../constants";
-import {
-  callGetTasks,
-  callUpdateTask,
-  callDeleteTask,
-} from "../../services/task";
+import { callUpdateTask, callGetTaskByUser } from "../../services/task";
 import { callGetStatuses } from "../../services/status";
-import { callGetSpaceMembers } from "../../services/space";
 import { toastError, toastSuccess } from "../../lib/toast";
-import { buildCells, fmtDate } from "../../lib/until";
-import { useModal } from "../../hook/useModal";
-import DetailTask from "./DetailTask";
-import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
-import BulkStatusModal from "../tools/BulkStatusModal";
-import BulkAssignModal from "../tools/BulkAssignModal";
-import MiniMonth from "../ui/MiniMonth";
+import { buildCells } from "../../lib/until";
 import { AvatarStack } from "../ui/AvatarStack";
 import { InlineDayEdit } from "../tools/InlineDayEdit";
-import { InlineDayCreate } from "../tools/InlineDayCreate";
+import NotFound from "../ui/NotFound";
+import BulkStatusModal from "../tools/BulkStatusModal";
+import MiniMonth from "../ui/MiniMonth";
+import DetailTask from "../tasks/DetailTask";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
 
-const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
+const MyTaskCalendarView: React.FC = () => {
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const today = dayjs();
   const [current, setCurrent] = useState(today.date(1));
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [selected, setSelected] = useState<Task | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
-  const [openCreateDate, setOpenCreateDate] = useState<string | null>(null);
-
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
-  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const [dragId, setDragId] = useState<number | null>(null);
-
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
 
   const fetchData = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const [taskRes, statusRes, memberRes] = await Promise.all([
-        callGetTasks(Number(listId)),
+      const [taskRes, statusRes] = await Promise.all([
+        callGetTaskByUser(user.id),
         callGetStatuses(),
-        callGetSpaceMembers(Number(spaceId)),
       ]);
-      setTasks(taskRes.data ?? []);
-      const sorted = [...(statusRes.data as Status[])].sort(
-        (a, b) => a.position - b.position,
-      );
+
+      const sts: Status[] = statusRes.data;
+      const sorted = [...sts].sort((a, b) => a.position - b.position);
       setStatuses(sorted);
-      setMembers(memberRes.data.members ?? []);
+
+      const allTasks: Task[] = taskRes.data ?? [];
+      setTasks(allTasks);
     } catch {
-      toastError("Failed to load.");
+      toastError("Failed to load tasks.");
     } finally {
       setLoading(false);
     }
-  }, [listId, spaceId]);
-
-  useImperativeHandle(ref, () => ({
-    refresh: fetchData,
-    getTasks: () => tasks,
-  }));
+  }, [user?.id]);
 
   useEffect(() => {
     fetchData();
@@ -95,21 +69,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       await fetchData();
     } catch {
       toastError("Failed to update.");
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    try {
-      setDeleting(true);
-      await Promise.all([...checkedIds].map(callDeleteTask));
-      toastSuccess(`${checkedIds.size} tasks deleted!`);
-      close();
-      setCheckedIds(new Set());
-      await fetchData();
-    } catch {
-      toastError("Failed to delete.");
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -126,26 +85,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       setCheckedIds(new Set());
       await fetchData();
     } catch {
-      toastError("Failed.");
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
-
-  const handleBulkAssign = async (memberIds: number[]) => {
-    try {
-      setBulkActionLoading(true);
-      await Promise.all(
-        [...checkedIds].map((id) =>
-          callUpdateTask(id, { assigneeIds: memberIds } as UpdateTask),
-        ),
-      );
-      toastSuccess("Assigned.");
-      setBulkAssignOpen(false);
-      setCheckedIds(new Set());
-      await fetchData();
-    } catch {
-      toastError("Failed.");
+      toastError("Failed to update status.");
     } finally {
       setBulkActionLoading(false);
     }
@@ -160,39 +100,34 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     });
   };
 
-  // Tasks for a given date string yyyy-mm-dd
-  const tasksForDate = (dateStr: string) =>
-    tasks.filter((t) => t.dueDate && t.dueDate.slice(0, 10) === dateStr);
-
-  // Unscheduled = no dueDate
-  const unscheduled = tasks.filter((t) => !t.dueDate);
-
-  // Drag drop: update dueDate
   const handleDropOnCell = (dateStr: string) => {
     if (!dragId) return;
     handleUpdate(dragId, { dueDate: dateStr } as UpdateTask);
     setDragId(null);
   };
 
-  const firstStatusId = statuses[0]?.id;
+  const tasksForDate = (dateStr: string) =>
+    tasks.filter(
+      (t) =>
+        t.dueDate &&
+        t.dueDate.trim() !== "" &&
+        t.dueDate.slice(0, 10) === dateStr,
+    );
 
-  // ── Render pill ─────────────────────────────────────────────────────────────
-  const renderPill = (task: Task, compact = false) => {
+  const unscheduled = tasks.filter(
+    (t) => !t.dueDate || t.dueDate.trim() === "",
+  );
+
+  const overdueTasks = tasks.filter(
+    (t) =>
+      t.dueDate &&
+      new Date(t.dueDate) < new Date() &&
+      t.dueDate.slice(0, 10) !== today.format("YYYY-MM-DD"),
+  );
+
+  const renderPill = (task: Task) => {
     const status = statuses.find((s) => s.id === task.statusId);
     const isChecked = checkedIds.has(task.id);
-
-    if (editingTaskId === task.id) {
-      return (
-        <InlineDayEdit
-          key={task.id}
-          task={task}
-          statuses={statuses}
-          members={members}
-          onClose={() => setEditingTaskId(null)}
-          onSaved={handleUpdate}
-        />
-      );
-    }
 
     return (
       <div
@@ -208,63 +143,72 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
           setSelected(task);
         }}
         className={`
-          group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md cursor-pointer
-          hover:opacity-90 transition-all text-[10px] font-semibold truncate
-          border-l-2
-          ${isChecked ? "ring-1 ring-indigo-400 ring-offset-0" : ""}
-          ${dragId === task.id ? "opacity-40" : ""}
-        `}
+        group/pill relative flex flex-col px-2 py-1 rounded-md cursor-pointer
+        hover:opacity-90 transition-all text-[10px] font-semibold border-l-2
+        ${isChecked ? "ring-1 ring-indigo-400" : ""}
+        ${dragId === task.id ? "opacity-40" : ""}
+      `}
         style={{
           backgroundColor: status ? `${status.color}15` : "#f5f5f4",
           color: status?.color ?? "#78716c",
           borderLeftColor: status?.color ?? "#d6d3d1",
         }}
       >
-        {/* Checkbox on hover */}
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={() => {}}
-          onClick={(e) => toggleCheck(task.id, e)}
-          className="accent-indigo-500 w-3 h-3 rounded flex-none opacity-0 group-hover/pill:opacity-100 transition-opacity"
-          style={isChecked ? { opacity: 1 } : {}}
-        />
-        <span className="truncate flex-1">{task.name}</span>
-        {task.priority && !compact && (
-          <span
-            className="w-1.5 h-1.5 rounded-full flex-none"
-            style={{
-              backgroundColor: priorityColor[task.priority] ?? "#78716c",
-            }}
+        <div className="flex items-center gap-1.5 truncate">
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => {}}
+            onClick={(e) => toggleCheck(task.id, e)}
+            className="accent-indigo-500 w-3 h-3 rounded flex-none opacity-0 group-hover/pill:opacity-100 transition-opacity"
+            style={isChecked ? { opacity: 1 } : {}}
           />
-        )}
-        {/* Edit on hover */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingTaskId(task.id);
-          }}
-          className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
-        >
-          <svg
-            className="w-2.5 h-2.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
+          <span className="truncate flex-1">{task.name}</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingTaskId(task.id);
+            }}
+            className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-2.5 h-2.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {task.list && (
+          <div className="flex items-center flex-wrap gap-0.5 mt-0.5 text-[8px] font-medium opacity-60">
+            {task.list?.category?.space?.name && (
+              <>
+                <span>{task.list.category.space.name}</span>
+                <span className="opacity-50">/</span>
+              </>
+            )}
+            {task.list?.category?.name && (
+              <>
+                <span>{task.list.category.name}</span>
+                <span className="opacity-50">/</span>
+              </>
+            )}
+            {task.list?.name && <span>{task.list.name}</span>}
+          </div>
+        )}
       </div>
     );
   };
 
-  // ── Skeleton ────────────────────────────────────────────────────────────────
+  // ── Skeleton ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -290,7 +234,9 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     );
   }
 
-  // ── Main ────────────────────────────────────────────────────────────────────
+  if (tasks.length === 0) return <NotFound />;
+
+  // ── Main ───────────────────────────────────────────────────────────────────
   return (
     <div
       className="w-full mt-4 flex gap-0 overflow-hidden rounded-xl border border-stone-200/60 bg-white/60"
@@ -301,7 +247,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 bg-white/80 flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            {/* Sidebar toggle */}
             <button
               onClick={() => setSidebarOpen((v) => !v)}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
@@ -372,13 +317,20 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </button>
           </div>
 
-          {/* Task count summary */}
           <div className="flex items-center gap-3 text-[11px] font-medium text-stone-400">
             <span>{tasks.length} tasks</span>
             <span className="text-stone-200">|</span>
             <span className="text-amber-500">
               {unscheduled.length} unscheduled
             </span>
+            {overdueTasks.length > 0 && (
+              <>
+                <span className="text-stone-200">|</span>
+                <span className="text-red-400">
+                  {overdueTasks.length} overdue
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -409,11 +361,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
               cell.cur &&
               current.isSame(today, "month") &&
               cell.day === today.date();
-            const isCreating = openCreateDate === dateStr && cell.cur;
             const isCellOverdue =
               cell.cur &&
               dayTasks.length > 0 &&
               cell.date.isBefore(today, "day");
+
             const MAX_VISIBLE = 3;
 
             return (
@@ -432,76 +384,34 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                 onDrop={() => {
                   if (cell.cur) handleDropOnCell(dateStr);
                 }}
-                onClick={() => {
-                  if (!cell.cur || isCreating) return;
-                  setOpenCreateDate(dateStr);
-                  setEditingTaskId(null);
-                }}
               >
                 {/* Day number */}
                 <div className="flex items-center justify-between mb-1">
                   <span
                     className={`
                       inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold
-                      ${!cell.cur ? "text-stone-300" : isToday ? "bg-indigo-600 text-white" : "text-stone-600 group-hover/cell:text-indigo-600"}
+                      ${
+                        !cell.cur
+                          ? "text-stone-300"
+                          : isToday
+                            ? "bg-indigo-600 text-white"
+                            : "text-stone-600 group-hover/cell:text-indigo-600"
+                      }
                     `}
                   >
                     {cell.day}
                   </span>
-                  {/* Add button on hover */}
-                  {cell.cur && !isCreating && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenCreateDate(dateStr);
-                        setEditingTaskId(null);
-                      }}
-                      className="opacity-0 group-hover/cell:opacity-100 p-0.5 rounded text-stone-300 hover:text-indigo-500 transition-all"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 4v16m8-8H4"
-                        />
-                      </svg>
-                    </button>
-                  )}
                 </div>
 
                 {/* Pills */}
                 <div className="space-y-0.5">
-                  {dayTasks
-                    .slice(0, MAX_VISIBLE)
-                    .map((t) => renderPill(t, true))}
+                  {dayTasks.slice(0, MAX_VISIBLE).map((t) => renderPill(t))}
                   {dayTasks.length > MAX_VISIBLE && (
                     <div className="text-[10px] font-bold text-stone-400 px-1">
                       +{dayTasks.length - MAX_VISIBLE} more
                     </div>
                   )}
                 </div>
-
-                {/* Inline create */}
-                {isCreating && (
-                  <InlineDayCreate
-                    date={dateStr}
-                    statusId={firstStatusId}
-                    listId={listId}
-                    members={members}
-                    statuses={statuses}
-                    onClose={() => setOpenCreateDate(null)}
-                    onCreated={() => {
-                      setOpenCreateDate(null);
-                      fetchData();
-                    }}
-                  />
-                )}
               </div>
             );
           })}
@@ -511,13 +421,13 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       {/* ── Sidebar ── */}
       {sidebarOpen && (
         <aside
-          className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto transition-all"
+          className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto"
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "#e7e5e4 transparent",
           }}
         >
-          {/* Status filter */}
+          {/* Status summary */}
           <div className="p-4 border-b border-stone-100">
             <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase mb-3">
               Status
@@ -529,7 +439,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                   <div key={s.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span
-                        className="w-2 h-2 rounded-full"
+                        className="w-2 h-2 rounded-full flex-none"
                         style={{ backgroundColor: s.color }}
                       />
                       <span className="text-xs font-medium text-stone-600">
@@ -544,6 +454,84 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
               })}
             </div>
           </div>
+
+          {/* Overdue */}
+          {overdueTasks.length > 0 && (
+            <div className="p-4 border-b border-stone-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[10px] font-bold tracking-[0.15em] text-red-400 uppercase">
+                  Overdue
+                </h3>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-400">
+                  {overdueTasks.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {overdueTasks.map((t) => {
+                  const status = statuses.find((s) => s.id === t.statusId);
+                  const isChecked = checkedIds.has(t.id);
+                  return (
+                    <div
+                      key={t.id}
+                      draggable
+                      onDragStart={() => setDragId(t.id)}
+                      onDragEnd={() => setDragId(null)}
+                      onClick={() => setSelected(t)}
+                      className={`
+                        p-2.5 bg-white rounded-xl border shadow-sm
+                        hover:border-red-200 hover:shadow-md transition-all cursor-pointer group/over
+                        ${isChecked ? "border-indigo-300 ring-1 ring-indigo-200" : "border-red-100"}
+                        ${dragId === t.id ? "opacity-40" : ""}
+                      `}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          onClick={(e) => toggleCheck(t.id, e)}
+                          className="accent-indigo-500 rounded w-3.5 h-3.5 mt-0.5 flex-none opacity-0 group-hover/over:opacity-100 transition-opacity"
+                          style={isChecked ? { opacity: 1 } : {}}
+                        />
+                        <span className="text-[11px] font-semibold text-stone-700 leading-snug flex-1">
+                          {t.name}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <svg
+                          className="w-3 h-3 text-red-400 flex-none"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <rect x="3" y="4" width="18" height="18" rx="2" />
+                          <path
+                            strokeLinecap="round"
+                            d="M16 2v4M8 2v4M3 10h18"
+                          />
+                        </svg>
+                        <span className="text-[10px] font-semibold text-red-400">
+                          {dayjs(t.dueDate).format("MMM D")}
+                        </span>
+                        {status && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ml-auto"
+                            style={{
+                              backgroundColor: `${status.color}18`,
+                              color: status.color,
+                            }}
+                          >
+                            {status.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Unscheduled */}
           <div className="p-4 flex-1">
@@ -581,7 +569,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                         checked={isChecked}
                         onChange={() => {}}
                         onClick={(e) => toggleCheck(t.id, e)}
-                        className="accent-indigo-500 w-3.5 h-3.5 mt-0.5 flex-none opacity-0 group-hover/unsched:opacity-100 transition-opacity"
+                        className="accent-indigo-500 rounded w-3.5 h-3.5 mt-0.5 flex-none opacity-0 group-hover/unsched:opacity-100 transition-opacity"
                         style={isChecked ? { opacity: 1 } : {}}
                       />
                       <span className="text-[11px] font-semibold text-stone-700 leading-snug flex-1 group-hover/unsched:text-indigo-600 transition-colors">
@@ -610,7 +598,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                       </button>
                     </div>
 
-                    {/* Edit inline in sidebar */}
+                    {/* Inline edit in sidebar */}
                     {editingTaskId === t.id && (
                       <div
                         className="mt-2"
@@ -619,14 +607,41 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                         <InlineDayEdit
                           task={t}
                           statuses={statuses}
-                          members={members}
+                          members={[]}
                           onClose={() => setEditingTaskId(null)}
                           onSaved={handleUpdate}
                         />
                       </div>
                     )}
 
-                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {/* Breadcrumb */}
+                    {t.list && (
+                      <div className="flex items-center gap-1 mt-1.5 text-[9px] text-stone-400 font-medium">
+                        {t.list?.category?.space?.name && (
+                          <>
+                            <span className="truncate max-w-[40px]">
+                              {t.list.category.space.name}
+                            </span>
+                            <span className="text-stone-300">/</span>
+                          </>
+                        )}
+                        {t.list?.category?.name && (
+                          <>
+                            <span className="truncate max-w-[40px]">
+                              {t.list.category.name}
+                            </span>
+                            <span className="text-stone-300">/</span>
+                          </>
+                        )}
+                        {t.list?.name && (
+                          <span className="truncate max-w-[40px]">
+                            {t.list.name}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                       {status && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
@@ -682,7 +697,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </div>
           </div>
 
-          {/* Mini month next */}
+          {/* Mini month */}
           <div className="p-4 border-t border-stone-100">
             <MiniMonth d={current.add(1, "month")} />
           </div>
@@ -699,13 +714,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             onSelect={handleBulkStatus}
             onClose={() => setBulkStatusOpen(false)}
           />
-          <BulkAssignModal
-            isOpen={bulkAssignOpen}
-            members={members}
-            loading={bulkActionLoading}
-            onSelect={handleBulkAssign}
-            onClose={() => setBulkAssignOpen(false)}
-          />
 
           <div className="fixed bottom-8 left-1/2 z-40 -translate-x-1/2 flex items-center gap-5 rounded-2xl border border-stone-200/60 bg-white/90 px-5 py-2.5 shadow-2xl backdrop-blur-md">
             <div className="flex items-center gap-2.5 border-r border-stone-200 pr-5">
@@ -716,10 +724,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  setBulkStatusOpen(true);
-                  setBulkAssignOpen(false);
-                }}
+                onClick={() => setBulkStatusOpen(true)}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px] text-stone-400">
@@ -730,48 +735,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                 </span>
               </button>
               <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  const id = [...checkedIds][0];
-                  if (id) setEditingTaskId(id);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
-              </button>
-              <button
-                onClick={open}
-                disabled={deleting}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-500 hover:bg-red-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  delete
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Delete
-                </span>
-              </button>
-              <button
                 onClick={() => setCheckedIds(new Set())}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-400 hover:bg-red-50 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px] text-stone-400">
                   close
@@ -785,19 +750,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         </>
       )}
 
-      {/* ── Confirm delete ── */}
-      <ConfirmDeleteModal
-        isOpen={isOpen}
-        loading={deleting}
-        title="Delete Task?"
-        description={`Delete ${checkedIds.size > 1 ? `${checkedIds.size} tasks` : "this task"}? This cannot be undone.`}
-        onClose={() => {
-          close();
-          setDeleteId(null);
-        }}
-        onConfirm={handleBulkDelete}
-      />
-
       {/* ── Detail drawer ── */}
       {selected && (
         <DetailTask
@@ -805,16 +757,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
           statuses={statuses}
           onClose={() => setSelected(null)}
           onUpdate={(data: UpdateTask) => handleUpdate(selected.id, data)}
-          onDelete={() => {
-            setDeleteId(selected.id);
-            setCheckedIds(new Set([selected.id]));
-            setSelected(null);
-            open();
-          }}
+          onDelete={() => {}}
         />
       )}
     </div>
   );
-});
+};
 
-export default CalendarView;
+export default MyTaskCalendarView;

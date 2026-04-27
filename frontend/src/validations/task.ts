@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { PriorityStatus } from "../constants";
 
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, "").trim();
+
 export const CreateTaskSchema = z.object({
   name: z
     .string()
@@ -12,7 +14,11 @@ export const CreateTaskSchema = z.object({
     .string()
     .trim()
     .min(1, "Description is required")
-    .max(1000, "Description is too long"),
+    .max(1000, "Description is too long")
+    .refine(
+      (val) => !val || stripHtml(val).length <= 1000,
+      "Description is too long"
+    ),
 
   priority: z.nativeEnum(PriorityStatus).optional(),
 
@@ -39,6 +45,10 @@ export const UpdateTaskSchema = z.object({
     .trim()
     .min(1, "Description is required")
     .max(1000, "Description is too long")
+    .refine(
+      (val) => !val || stripHtml(val).length <= 1000,
+      "Description is too long"
+    )
     .optional(),
 
   priority: z.nativeEnum(PriorityStatus).optional(),

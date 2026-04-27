@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Member } from "../../types/task";
+import ReactQuill from "react-quill-new";
 import { CreateTaskFormData, CreateTaskSchema } from "../../validations/task";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PriorityStatus } from "../../constants";
+import { PriorityStatus, QUILL_FORMATS, QUILL_MODULES, today } from "../../constants";
 import { callCreateTask } from "../../services/task";
-import { toISO } from "../../lib/until";
+import { stripHtml, toISO } from "../../lib/until";
 import { toastError, toastSuccess } from "../../lib/toast";
 import { AssigneeDropdown } from "./AssigneeDropdown";
 
@@ -48,6 +49,8 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
       assignees: [],
     },
   });
+
+  const startDate = watch("startDate");
 
   useEffect(() => {
     setTimeout(() => nameRef.current?.focus(), 50);
@@ -169,6 +172,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
         <div className="px-1">
           <input
             type="date"
+            min={today}
             {...register("startDate")}
             className={`text-[11px] text-stone-500 bg-white border rounded-lg px-2 py-1 outline-none focus:border-indigo-300 w-full ${
               errors.startDate ? "border-red-300" : "border-stone-200"
@@ -180,6 +184,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
         <div className="px-1">
           <input
             type="date"
+            min={startDate}
             {...register("dueDate")}
             className={`text-[11px] text-stone-500 bg-white border rounded-lg px-2 py-1 outline-none focus:border-indigo-300 w-full ${
               errors.dueDate ? "border-red-300" : "border-stone-200"
@@ -204,37 +209,77 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
       </div>
 
       {/* description row */}
-      <div className="flex item-center justify-between gap-5 px-5 pb-2.5">
-        <div className="flex-1">
-          <input
-            {...register("description")}
-            placeholder="Description (optional)..."
-            className={`w-full rounded-full bg-transparent text-[12px] text-stone-500 placeholder:text-stone-300 outline-none border-b border-dashed py-0.5 transition-colors ${
-              errors.description
-                ? "border-red-300 focus:border-red-400"
-                : "border-stone-100 focus:border-indigo-200"
-            }`}
+      <div className="flex items-start gap-2.5 px-3 pb-3 border-t border-stone-100">
+        {/* Quill wrapper */}
+        <div className="flex-1 min-w-0">
+          <Controller
+            control={control}
+            name="description"
+            render={({ field }) => (
+              <div
+                className={`
+                  rounded-lg overflow-hidden
+                        border bg-white
+                        ${
+                          errors.description
+                            ? "border-red-300 ring-2 ring-red-100"
+                            : "border-stone-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-50"
+                        }
+                      `}
+              >
+                <ReactQuill
+                  theme="snow"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur} 
+                  modules={QUILL_MODULES}
+                  formats={QUILL_FORMATS}
+                  className="quill-inline-v2"
+                />
+
+                <div
+                  className={`
+                  text-right text-[10px] px-2.5 py-1
+                  border-t border-stone-100 bg-stone-50
+                  ${
+                    stripHtml(field.value ?? "").length > 1000
+                      ? "text-red-400"
+                      : stripHtml(field.value ?? "").length > 900
+                        ? "text-amber-400"
+                        : "text-stone-300"
+                  }
+            `}
+                >
+                  {stripHtml(field.value ?? "").length} / 1000
+                </div>
+              </div>
+            )}
           />
+
           {errors.description && (
-            <p className="text-[10px] text-red-400 mt-0.5">
+            <p className="text-[10px] text-red-400 mt-1">
               {errors.description.message}
             </p>
           )}
         </div>
-        <div className="px-1 flex items-center gap-1">
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 pt-1 flex-shrink-0">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="h-7 px-3 rounded-lg bg-indigo-500 text-white text-[11px] font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors flex-shrink-0"
+            className="h-[30px] px-3.5 rounded-lg bg-indigo-500 text-white text-[12px] font-medium
+                 hover:bg-indigo-600 disabled:opacity-40 transition-colors"
           >
             {isSubmitting ? "…" : "Add"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 transition-colors flex-shrink-0"
+            className="h-[30px] w-[30px] flex items-center justify-center rounded-lg
+                 border border-stone-200 text-stone-400 hover:bg-stone-100 transition-colors"
           >
-            <span className="material-symbols-outlined text-[15px]">close</span>
+            <span className="material-symbols-outlined text-[14px]">close</span>
           </button>
         </div>
       </div>

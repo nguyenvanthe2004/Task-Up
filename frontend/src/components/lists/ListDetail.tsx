@@ -1,26 +1,75 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Task } from "../../types/task";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Member, CreateTask, ImportTask, Task, ListViewHandle } from "../../types/task";
 import KanbanBoard from "../tasks/KanbanBoard";
 import CalendarView from "../tasks/CalendarView";
 import DetailTask from "../tasks/DetailTask";
 import ListView from "../tasks/ListView";
 import { Space } from "../../types/space";
-import { toastError } from "../../lib/toast";
+import { toastError, toastSuccess } from "../../lib/toast";
 import { callGetSpaceById } from "../../services/space";
 import { List } from "../../types/list";
 import { callGetListById } from "../../services/list";
 import { Category } from "../../types/category";
-import { useSelector } from "react-redux";
-import { RootState } from "../../redux/store";
-import { Workspace } from "../../types/workspace";
+import { exportCSV, exportExcel, exportJSON } from "../../lib/export";
+import { callCreateTask } from "../../services/task";
+import { importFile } from "../../lib/import";
+import { PriorityStatus } from "../../constants";
 
-type ListView = "list" | "kanban" | "calendar";
+type ListViewType = "list" | "kanban" | "calendar";
+
+const VIEW_TABS: { key: ListViewType; icon: string; label: string }[] = [
+  { key: "list", icon: "format_list_bulleted", label: "List" },
+  { key: "kanban", icon: "view_kanban", label: "Board" },
+  { key: "calendar", icon: "calendar_month", label: "Calendar" },
+];
+
+const CHUNK_SIZE = 10;
+
+const normalizeItem = (item: Record<string, any>): ImportTask => ({
+  name: item.Name ?? item.name,
+  description: item.Description ?? item.description ?? "",
+  statusId: Number(item.StatusId ?? item.statusId),
+  priority: item.Priority ?? item.priority,
+  tag: item.Tag ?? item.tag,
+  startDate: item.StartDate ?? item.startDate,
+  dueDate: item.DueDate ?? item.dueDate,
+  assignees: item.Assignees
+    ? String(item.Assignees)
+        .split(",")
+        .map((x: string) => Number(x.trim()))
+        .filter(Boolean)
+    : [],
+});
+
+const validateItem = (item: ImportTask, index: number): string | null => {
+  if (!item.name) return `Row ${index + 1}: missing name`;
+  if (!item.statusId || isNaN(item.statusId))
+    return `Row ${index + 1}: invalid statusId`;
+  return null;
+};
+
+const toCreateTask = (item: ImportTask, listId: number): CreateTask => ({
+  name: item.name,
+  description: item.description ?? "",
+  statusId: item.statusId!,
+  listId,
+  priority: item.priority as PriorityStatus | undefined,
+  tag: item.tag,
+  startDate: item.startDate,
+  dueDate: item.dueDate,
+  assignees: item.assignees?.map((a) =>
+    typeof a === "number" ? a : (a as Member).id,
+  ),
+});
 
 const ListDetail: React.FC = () => {
-  const { listId } = useParams<{ listId: string }>();
-  const { workspaceId } = useParams();
-  const [view, setView] = useState<ListView>("list");
+  const listViewRef = useRef<ListViewHandle>(null);
+  const { categoryId, listId } = useParams<{ categoryId: string, listId: string }>();
+  const { workspaceId, spaceId } = useParams();
+  const [searchParams] = useSearchParams();
+  const modeView = searchParams.get("mode");
+  const [view, setView] = useState<ListViewType>("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const navigate = useNavigate();
   const [list, setList] = useState<List | null>(null);
@@ -30,30 +79,31 @@ const ListDetail: React.FC = () => {
   const exportRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
-  const user = useSelector((state: RootState) => state.auth.currentUser);
-  const userWorkspaces: Workspace[] = user?.workspaces ?? [];
-  const workspace = userWorkspaces.find((w) => w.id === Number(workspaceId));
+  const onClick = (mode: ListViewType) => {
+    navigate(`/${workspaceId}/spaces/${spaceId}/${categoryId}/${listId}?mode=${mode}`);
+  };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!listId) return;
     try {
       const res = await callGetListById(Number(listId));
       const listData = res.data;
-      setList(res.data);
+      setList(listData);
       const cat = listData?.category ?? null;
       setCategory(cat);
       if (cat?.spaceId) {
-        const res = await callGetSpaceById(Number(cat.spaceId));
-        setSpace(res.data);
+        const spaceRes = await callGetSpaceById(Number(cat.spaceId));
+        setSpace(spaceRes.data);
       }
     } catch (error: any) {
       toastError(error.message);
     }
-  };
+  }, [listId]);
 
   useEffect(() => {
-    if (!listId) return;
     fetchData();
-  }, [listId]);
+    !modeView ? setView("list") : setView(modeView as ListViewType);
+  }, [fetchData, modeView]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -65,25 +115,64 @@ const ListDetail: React.FC = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // TODO: handle import logic
-    console.log("Importing file:", file.name);
+
     e.target.value = "";
+
+    try {
+      const rawData: Record<string, any>[] = file.name.endsWith(".json")
+        ? JSON.parse(await file.text())
+        : await importFile(file);
+
+      if (!rawData?.length) throw new Error("File has no data");
+
+      const errors: string[] = [];
+      const tasks: CreateTask[] = [];
+
+      for (let i = 0; i < rawData.length; i++) {
+        const normalized = normalizeItem(rawData[i]);
+        const error = validateItem(normalized, i);
+
+        if (error) {
+          errors.push(error);
+          continue;
+        }
+
+        tasks.push(toCreateTask(normalized, Number(listId)));
+      }
+
+      if (errors.length) console.warn("⚠️ Skipped rows:\n" + errors.join("\n"));
+      if (!tasks.length) throw new Error("No valid tasks to import");
+
+      for (let i = 0; i < tasks.length; i += CHUNK_SIZE) {
+        await Promise.all(tasks.slice(i, i + CHUNK_SIZE).map(callCreateTask));
+      }
+
+      listViewRef.current?.refresh();
+      toastSuccess(
+        `Successfully imported ${tasks.length} task${tasks.length > 1 ? "s" : ""}${
+          errors.length
+            ? `, skipped ${errors.length} invalid row${errors.length > 1 ? "s" : ""}`
+            : ""
+        }`,
+      );
+    } catch (err: any) {
+      console.error(err);
+      toastError(err.message || "Import failed");
+    }
   };
 
   const handleExport = (format: "csv" | "json" | "xlsx") => {
-    // TODO: handle export logic per format
-    console.log("Exporting as:", format);
+    if (!list) return;
+    const tasks = listViewRef.current?.getTasks() ?? [];
+
+    if (format === "csv") exportCSV(tasks);
+    if (format === "json") exportJSON(tasks);
+    if (format === "xlsx") exportExcel(tasks);
     setExportOpen(false);
   };
-
-  const VIEW_TABS: { key: ListView; icon: string; label: string }[] = [
-    { key: "list", icon: "format_list_bulleted", label: "List" },
-    { key: "kanban", icon: "view_kanban", label: "Board" },
-    { key: "calendar", icon: "calendar_month", label: "Calendar" },
-  ];
 
   return (
     <main className="ml-64 pt-14 min-h-screen flex flex-col">
@@ -93,7 +182,7 @@ const ListDetail: React.FC = () => {
           <div>
             <nav className="flex items-center gap-2 mb-2">
               <button
-                onClick={() => navigate(`/${workspace?.id}/spaces`)}
+                onClick={() => navigate(`/${workspaceId}/spaces`)}
                 className="text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors"
               >
                 Spaces
@@ -103,7 +192,7 @@ const ListDetail: React.FC = () => {
               </span>
               <button
                 onClick={() =>
-                  navigate(`/${workspace?.id}/spaces/${category?.spaceId}`)
+                  navigate(`/${workspaceId}/spaces/${category?.spaceId}`)
                 }
                 className="text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors"
               >
@@ -130,7 +219,7 @@ const ListDetail: React.FC = () => {
               {VIEW_TABS.map(({ key, icon, label }) => (
                 <button
                   key={key}
-                  onClick={() => setView(key)}
+                  onClick={() => onClick(key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     view === key
                       ? "bg-white text-indigo-600 shadow-sm"
@@ -144,6 +233,7 @@ const ListDetail: React.FC = () => {
                 </button>
               ))}
             </div>
+
             {/* ── Import button ── */}
             <input
               ref={importRef}
@@ -234,9 +324,9 @@ const ListDetail: React.FC = () => {
           </div>
         </div>
 
-        {view === "list" && <ListView />}
-        {view === "kanban" && <KanbanBoard />}
-        {view === "calendar" && <CalendarView />}
+        {view === "list" && <ListView ref={listViewRef} />}
+        {view === "kanban" && <KanbanBoard ref={listViewRef} />}
+        {view === "calendar" && <CalendarView ref={listViewRef} />}
 
         {view === "list" && selectedTask && (
           <DetailTask

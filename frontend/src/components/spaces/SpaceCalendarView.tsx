@@ -1,41 +1,40 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useImperativeHandle,
-  forwardRef,
-} from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import dayjs from "dayjs";
 import { useParams } from "react-router-dom";
-import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
+import { Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
+import { Category } from "../../types/category";
+import { List } from "../../types/list";
 import { priorityBadge, priorityColor, WEEKDAYS } from "../../constants";
-import {
-  callGetTasks,
-  callUpdateTask,
-  callDeleteTask,
-} from "../../services/task";
+import { callDeleteTask, callUpdateTask } from "../../services/task";
+import { callGetCategories } from "../../services/category";
 import { callGetStatuses } from "../../services/status";
 import { callGetSpaceMembers } from "../../services/space";
 import { toastError, toastSuccess } from "../../lib/toast";
-import { buildCells, fmtDate } from "../../lib/until";
+import { buildCells } from "../../lib/until";
 import { useModal } from "../../hook/useModal";
-import DetailTask from "./DetailTask";
+import DetailTask from "../tasks/DetailTask";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
 import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
 import MiniMonth from "../ui/MiniMonth";
 import { AvatarStack } from "../ui/AvatarStack";
-import { InlineDayEdit } from "../tools/InlineDayEdit";
 import { InlineDayCreate } from "../tools/InlineDayCreate";
+import { InlineDayEdit } from "../tools/InlineDayEdit";
+import NotFound from "../ui/NotFound";
 
-const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
+interface ListFlat extends List {
+  categoryName: string;
+  categoryId: number;
+}
+
+const SpaceCalendarView: React.FC = () => {
+  const { spaceId } = useParams<{ spaceId: string }>();
 
   const today = dayjs();
   const [current, setCurrent] = useState(today.date(1));
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [lists, setLists] = useState<ListFlat[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,7 +45,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const [deleting, setDeleting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
-  const [openCreateDate, setOpenCreateDate] = useState<string | null>(null);
+  const [openCreateKey, setOpenCreateKey] = useState<string | null>(null);
 
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
@@ -56,38 +55,52 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+
+  const [activeListId, setActiveListId] = useState<number | null>(null);
+
   const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [taskRes, statusRes, memberRes] = await Promise.all([
-        callGetTasks(Number(listId)),
+      const [categoryRes, statusRes, memberRes] = await Promise.all([
+        callGetCategories(Number(spaceId)),
         callGetStatuses(),
         callGetSpaceMembers(Number(spaceId)),
       ]);
-      setTasks(taskRes.data ?? []);
-      const sorted = [...(statusRes.data as Status[])].sort(
-        (a, b) => a.position - b.position,
-      );
+
+      const sts: Status[] = statusRes.data;
+      const sorted = [...sts].sort((a, b) => a.position - b.position);
       setStatuses(sorted);
       setMembers(memberRes.data.members ?? []);
+
+      const allTasks: Task[] = [];
+      const allLists: ListFlat[] = [];
+
+      for (const cat of categoryRes.data as Category[]) {
+        for (const list of cat.lists ?? []) {
+          allLists.push({
+            ...list,
+            categoryName: cat.name,
+            categoryId: cat.id,
+          });
+          const listTasks: Task[] = (list as any).tasks ?? [];
+          allTasks.push(...listTasks);
+        }
+      }
+
+      setLists(allLists);
+      setTasks(allTasks);
     } catch {
       toastError("Failed to load.");
     } finally {
       setLoading(false);
     }
-  }, [listId, spaceId]);
+  }, [spaceId]);
 
-  useImperativeHandle(ref, () => ({
-    refresh: fetchData,
-    getTasks: () => tasks,
-  }));
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -99,6 +112,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   };
 
   const handleBulkDelete = async () => {
+    if (checkedIds.size === 0) return;
     try {
       setDeleting(true);
       await Promise.all([...checkedIds].map(callDeleteTask));
@@ -116,11 +130,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const handleBulkStatus = async (statusId: number) => {
     try {
       setBulkActionLoading(true);
-      await Promise.all(
-        [...checkedIds].map((id) =>
-          callUpdateTask(id, { statusId } as UpdateTask),
-        ),
-      );
+      await Promise.all([...checkedIds].map((id) => callUpdateTask(id, { statusId } as UpdateTask)));
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
@@ -135,11 +145,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const handleBulkAssign = async (memberIds: number[]) => {
     try {
       setBulkActionLoading(true);
-      await Promise.all(
-        [...checkedIds].map((id) =>
-          callUpdateTask(id, { assigneeIds: memberIds } as UpdateTask),
-        ),
-      );
+      await Promise.all([...checkedIds].map((id) => callUpdateTask(id, { assignees: memberIds } as UpdateTask)));
       toastSuccess("Assigned.");
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
@@ -160,14 +166,24 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     });
   };
 
-  // Tasks for a given date string yyyy-mm-dd
+  const toggleCategory = (id: number) =>
+    setCollapsedCategories((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+  const visibleTasks = activeListId
+    ? tasks.filter((t) => t.listId === activeListId)
+    : tasks;
+
   const tasksForDate = (dateStr: string) =>
-    tasks.filter((t) => t.dueDate && t.dueDate.slice(0, 10) === dateStr);
+    visibleTasks.filter(
+      (t) => t.dueDate && t.dueDate.trim() !== "" && t.dueDate.slice(0, 10) === dateStr
+    );
 
-  // Unscheduled = no dueDate
-  const unscheduled = tasks.filter((t) => !t.dueDate);
+  const unscheduled = visibleTasks.filter((t) => !t.dueDate || t.dueDate.trim() === "");
 
-  // Drag drop: update dueDate
   const handleDropOnCell = (dateStr: string) => {
     if (!dragId) return;
     handleUpdate(dragId, { dueDate: dateStr } as UpdateTask);
@@ -176,10 +192,23 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
   const firstStatusId = statuses[0]?.id;
 
-  // ── Render pill ─────────────────────────────────────────────────────────────
-  const renderPill = (task: Task, compact = false) => {
+  const activeList = activeListId ? lists.find((l) => l.id === activeListId) : null;
+
+  const listsByCategory = lists.reduce<Record<number, { catName: string; catId: number; lists: ListFlat[] }>>(
+    (acc, list) => {
+      if (!acc[list.categoryId]) {
+        acc[list.categoryId] = { catName: list.categoryName, catId: list.categoryId, lists: [] };
+      }
+      acc[list.categoryId].lists.push(list);
+      return acc;
+    },
+    {}
+  );
+
+  const renderPill = (task: Task) => {
     const status = statuses.find((s) => s.id === task.statusId);
     const isChecked = checkedIds.has(task.id);
+    const list = lists.find((l) => l.id === task.listId);
 
     if (editingTaskId === task.id) {
       return (
@@ -198,20 +227,13 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       <div
         key={task.id}
         draggable
-        onDragStart={(e) => {
-          e.stopPropagation();
-          setDragId(task.id);
-        }}
+        onDragStart={(e) => { e.stopPropagation(); setDragId(task.id); }}
         onDragEnd={() => setDragId(null)}
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelected(task);
-        }}
+        onClick={(e) => { e.stopPropagation(); setSelected(task); }}
         className={`
           group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md cursor-pointer
-          hover:opacity-90 transition-all text-[10px] font-semibold truncate
-          border-l-2
-          ${isChecked ? "ring-1 ring-indigo-400 ring-offset-0" : ""}
+          hover:opacity-90 transition-all text-[10px] font-semibold truncate border-l-2
+          ${isChecked ? "ring-1 ring-indigo-400" : ""}
           ${dragId === task.id ? "opacity-40" : ""}
         `}
         style={{
@@ -220,7 +242,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
           borderLeftColor: status?.color ?? "#d6d3d1",
         }}
       >
-        {/* Checkbox on hover */}
         <input
           type="checkbox"
           checked={isChecked}
@@ -230,34 +251,21 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
           style={isChecked ? { opacity: 1 } : {}}
         />
         <span className="truncate flex-1">{task.name}</span>
-        {task.priority && !compact && (
+        {!activeListId && list && (
           <span
-            className="w-1.5 h-1.5 rounded-full flex-none"
-            style={{
-              backgroundColor: priorityColor[task.priority] ?? "#78716c",
-            }}
-          />
+            className="text-[8px] font-bold px-1 py-0.5 rounded flex-none opacity-60 bg-current/10 truncate max-w-[40px]"
+            style={{ color: "inherit" }}
+          >
+            {list.name}
+          </span>
         )}
-        {/* Edit on hover */}
+
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingTaskId(task.id);
-          }}
+          onClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); }}
           className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
         >
-          <svg
-            className="w-2.5 h-2.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-            />
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
           </svg>
         </button>
       </div>
@@ -267,17 +275,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   // ── Skeleton ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div
-        className="w-full mt-4 rounded-xl border border-stone-200/60 bg-white/60 animate-pulse"
-        style={{ minHeight: "calc(100vh - 200px)" }}
-      >
+      <div className="w-full mt-4 rounded-xl border border-stone-200/60 bg-white/60 animate-pulse" style={{ minHeight: "calc(100vh - 200px)" }}>
         <div className="h-12 border-b border-stone-100 bg-stone-50/80 rounded-t-xl" />
         <div className="grid grid-cols-7">
           {Array.from({ length: 35 }).map((_, i) => (
-            <div
-              key={i}
-              className="border-r border-b border-stone-100 p-2 min-h-[100px]"
-            >
+            <div key={i} className="border-r border-b border-stone-100 p-2 min-h-[100px]">
               <div className="w-5 h-5 rounded-full bg-stone-200 mb-2" />
               <div className="space-y-1">
                 <div className="h-3 rounded bg-stone-100" />
@@ -298,27 +300,17 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     >
       {/* ── Calendar main ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 bg-white/80 flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            {/* Sidebar toggle */}
             <button
               onClick={() => setSidebarOpen((v) => !v)}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
               title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 6h16M4 12h10M4 18h16"
-                />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16" />
               </svg>
             </button>
 
@@ -326,18 +318,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
               onClick={() => setCurrent((c) => c.subtract(1, "month"))}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 19l-7-7 7-7"
-                />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
 
@@ -349,18 +331,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
               onClick={() => setCurrent((c) => c.add(1, "month"))}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
 
@@ -372,23 +344,36 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </button>
           </div>
 
-          {/* Task count summary */}
-          <div className="flex items-center gap-3 text-[11px] font-medium text-stone-400">
-            <span>{tasks.length} tasks</span>
-            <span className="text-stone-200">|</span>
-            <span className="text-amber-500">
-              {unscheduled.length} unscheduled
-            </span>
+          <div className="flex items-center gap-3">
+            {/* Active list badge */}
+            {activeList && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <span className="text-[11px] font-semibold text-indigo-600 truncate max-w-[100px]">
+                  {activeList.name}
+                </span>
+                <button
+                  onClick={() => setActiveListId(null)}
+                  className="text-indigo-400 hover:text-indigo-600 transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 text-[11px] font-medium text-stone-400">
+              <span>{visibleTasks.length} tasks</span>
+              <span className="text-stone-200">|</span>
+              <span className="text-amber-500">{unscheduled.length} unscheduled</span>
+            </div>
           </div>
         </div>
 
         {/* Weekday labels */}
         <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/50">
           {WEEKDAYS.map((d) => (
-            <div
-              key={d}
-              className="py-2 text-center text-[10px] font-bold tracking-widest text-stone-400 uppercase"
-            >
+            <div key={d} className="py-2 text-center text-[10px] font-bold tracking-widest text-stone-400 uppercase">
               {d}
             </div>
           ))}
@@ -397,25 +382,22 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         {/* Grid */}
         <div
           className="flex-1 grid grid-cols-7 overflow-y-auto"
-          style={{
-            scrollbarWidth: "thin",
-            scrollbarColor: "#e7e5e4 transparent",
-          }}
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
         >
           {cells.map((cell, i) => {
             const dateStr = cell.date.format("YYYY-MM-DD");
             const dayTasks = cell.cur ? tasksForDate(dateStr) : [];
-            const isToday =
-              cell.cur &&
-              current.isSame(today, "month") &&
-              cell.day === today.date();
-            const isCreating = openCreateDate === dateStr && cell.cur;
+            const isToday = cell.cur && current.isSame(today, "month") && cell.day === today.date();
+            const MAX_VISIBLE = 3;
+
+            // Create key: date + active list (or first list if none selected)
+            const createListId = activeListId ?? lists[0]?.id;
+            const createKey = `${dateStr}|${createListId}`;
+            const isCreating = openCreateKey === createKey && cell.cur;
             const isCellOverdue =
               cell.cur &&
               dayTasks.length > 0 &&
               cell.date.isBefore(today, "day");
-            const MAX_VISIBLE = 3;
-
             return (
               <div
                 key={i}
@@ -426,15 +408,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                 ${isCellOverdue ? "border-red-100" : ""}
                 ${i % 7 === 6 ? "border-r-0" : ""}
                 `}
-                onDragOver={(e) => {
-                  if (cell.cur) e.preventDefault();
-                }}
-                onDrop={() => {
-                  if (cell.cur) handleDropOnCell(dateStr);
-                }}
+                onDragOver={(e) => { if (cell.cur) e.preventDefault(); }}
+                onDrop={() => { if (cell.cur) handleDropOnCell(dateStr); }}
                 onClick={() => {
                   if (!cell.cur || isCreating) return;
-                  setOpenCreateDate(dateStr);
+                  setOpenCreateKey(createKey);
                   setEditingTaskId(null);
                 }}
               >
@@ -443,33 +421,24 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                   <span
                     className={`
                       inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold
-                      ${!cell.cur ? "text-stone-300" : isToday ? "bg-indigo-600 text-white" : "text-stone-600 group-hover/cell:text-indigo-600"}
+                      ${!cell.cur ? "text-stone-300"
+                        : isToday ? "bg-indigo-600 text-white"
+                        : "text-stone-600 group-hover/cell:text-indigo-600"}
                     `}
                   >
                     {cell.day}
                   </span>
-                  {/* Add button on hover */}
                   {cell.cur && !isCreating && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenCreateDate(dateStr);
+                        setOpenCreateKey(createKey);
                         setEditingTaskId(null);
                       }}
                       className="opacity-0 group-hover/cell:opacity-100 p-0.5 rounded text-stone-300 hover:text-indigo-500 transition-all"
                     >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 4v16m8-8H4"
-                        />
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
                     </button>
                   )}
@@ -477,9 +446,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
                 {/* Pills */}
                 <div className="space-y-0.5">
-                  {dayTasks
-                    .slice(0, MAX_VISIBLE)
-                    .map((t) => renderPill(t, true))}
+                  {dayTasks.slice(0, MAX_VISIBLE).map((t) => renderPill(t))}
                   {dayTasks.length > MAX_VISIBLE && (
                     <div className="text-[10px] font-bold text-stone-400 px-1">
                       +{dayTasks.length - MAX_VISIBLE} more
@@ -488,18 +455,15 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                 </div>
 
                 {/* Inline create */}
-                {isCreating && (
+                {isCreating && createListId && (
                   <InlineDayCreate
                     date={dateStr}
                     statusId={firstStatusId}
-                    listId={listId}
+                    listId={String(createListId)}
                     members={members}
                     statuses={statuses}
-                    onClose={() => setOpenCreateDate(null)}
-                    onCreated={() => {
-                      setOpenCreateDate(null);
-                      fetchData();
-                    }}
+                    onClose={() => setOpenCreateKey(null)}
+                    onCreated={() => { setOpenCreateKey(null); fetchData(); }}
                   />
                 )}
               </div>
@@ -511,30 +475,87 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       {/* ── Sidebar ── */}
       {sidebarOpen && (
         <aside
-          className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto transition-all"
-          style={{
-            scrollbarWidth: "thin",
-            scrollbarColor: "#e7e5e4 transparent",
-          }}
+          className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
         >
-          {/* Status filter */}
+          {/* Lists by category — filter */}
+          <div className="p-4 border-b border-stone-100">
+            <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase mb-3">
+              Lists
+            </h3>
+
+            {/* All lists option */}
+            <button
+              onClick={() => setActiveListId(null)}
+              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg mb-1 transition-colors text-left ${
+                !activeListId ? "bg-indigo-50 text-indigo-600" : "hover:bg-stone-100 text-stone-500"
+              }`}
+            >
+              <span className="text-[11px] font-semibold">All lists</span>
+              <span className="text-[10px] font-bold bg-stone-100 text-stone-400 rounded-full px-1.5 py-0.5">
+                {tasks.length}
+              </span>
+            </button>
+
+            {Object.values(listsByCategory).map((group) => {
+              const isCollapsed = collapsedCategories.has(group.catId);
+              return (
+                <div key={group.catId} className="mb-2">
+                  <button
+                    onClick={() => toggleCategory(group.catId)}
+                    className="flex items-center gap-1.5 w-full text-left px-1 py-1"
+                  >
+                    <span
+                      className="material-symbols-outlined text-[13px] text-stone-400 transition-transform duration-150"
+                      style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
+                    >
+                      expand_more
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-stone-400 truncate">
+                      {group.catName}
+                    </span>
+                  </button>
+
+                  {!isCollapsed && (
+                    <div className="space-y-0.5 pl-1">
+                      {group.lists.map((list) => {
+                        const count = tasks.filter((t) => t.listId === list.id).length;
+                        const isActive = activeListId === list.id;
+                        return (
+                          <button
+                            key={list.id}
+                            onClick={() => setActiveListId(isActive ? null : list.id)}
+                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors text-left ${
+                              isActive ? "bg-indigo-50 text-indigo-600" : "hover:bg-stone-100 text-stone-600"
+                            }`}
+                          >
+                            <span className="text-[11px] font-medium truncate">{list.name}</span>
+                            <span className="text-[10px] font-bold bg-stone-100 text-stone-400 rounded-full px-1.5 py-0.5 flex-none ml-1">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Status summary */}
           <div className="p-4 border-b border-stone-100">
             <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase mb-3">
               Status
             </h3>
             <div className="space-y-1.5">
               {statuses.map((s) => {
-                const count = tasks.filter((t) => t.statusId === s.id).length;
+                const count = visibleTasks.filter((t) => t.statusId === s.id).length;
                 return (
                   <div key={s.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: s.color }}
-                      />
-                      <span className="text-xs font-medium text-stone-600">
-                        {s.name}
-                      </span>
+                      <span className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: s.color }} />
+                      <span className="text-xs font-medium text-stone-600">{s.name}</span>
                     </div>
                     <span className="text-[10px] font-bold text-stone-400 bg-stone-100 rounded-full px-1.5 py-0.5">
                       {count}
@@ -559,6 +580,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             <div className="space-y-2">
               {unscheduled.map((t) => {
                 const status = statuses.find((s) => s.id === t.statusId);
+                const list = lists.find((l) => l.id === t.listId);
                 const isChecked = checkedIds.has(t.id);
 
                 return (
@@ -588,34 +610,18 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                         {t.name}
                       </span>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTaskId(t.id);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); setEditingTaskId(t.id); }}
                         className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
                       >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-                          />
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
                         </svg>
                       </button>
                     </div>
 
-                    {/* Edit inline in sidebar */}
+                    {/* Inline edit in sidebar */}
                     {editingTaskId === t.id && (
-                      <div
-                        className="mt-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                         <InlineDayEdit
                           task={t}
                           statuses={statuses}
@@ -626,26 +632,27 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                       </div>
                     )}
 
-                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {/* Breadcrumb */}
+                    {list && (
+                      <div className="flex items-center gap-1 mt-1.5 text-[9px] text-stone-400 font-medium">
+                        <span className="truncate max-w-[50px]">{list.categoryName}</span>
+                        <span className="text-stone-300">/</span>
+                        <span className="truncate max-w-[50px]">{list.name}</span>
+                      </div>
+                    )}
+
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                       {status && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                          style={{
-                            backgroundColor: `${status.color}18`,
-                            color: status.color,
-                          }}
+                          style={{ backgroundColor: `${status.color}18`, color: status.color }}
                         >
-                          <span
-                            className="w-1 h-1 rounded-full"
-                            style={{ backgroundColor: status.color }}
-                          />
+                          <span className="w-1 h-1 rounded-full" style={{ backgroundColor: status.color }} />
                           {status.name}
                         </span>
                       )}
                       {t.priority && (
-                        <span
-                          className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded px-1.5 py-0.5 ${priorityBadge[t.priority] ?? "bg-stone-50 text-stone-500"}`}
-                        >
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded px-1.5 py-0.5 ${priorityBadge[t.priority] ?? "bg-stone-50 text-stone-500"}`}>
                           <span className="w-1 h-1 rounded-full bg-current opacity-70" />
                           {t.priority}
                         </span>
@@ -663,18 +670,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
               {unscheduled.length === 0 && (
                 <div className="flex flex-col items-center py-6 text-stone-300">
-                  <svg
-                    className="w-6 h-6 mb-1"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
+                  <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <p className="text-xs font-medium">All scheduled!</p>
                 </div>
@@ -682,7 +679,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </div>
           </div>
 
-          {/* Mini month next */}
+          {/* Mini month */}
           <div className="p-4 border-t border-stone-100">
             <MiniMonth d={current.add(1, "month")} />
           </div>
@@ -716,69 +713,40 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  setBulkStatusOpen(true);
-                  setBulkAssignOpen(false);
-                }}
+                onClick={() => { setBulkStatusOpen(true); setBulkAssignOpen(false); }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  assignment_turned_in
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Status
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">assignment_turned_in</span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">Status</span>
               </button>
               <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
+                onClick={() => { setBulkAssignOpen(true); setBulkStatusOpen(false); }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">person_add</span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">Assign</span>
               </button>
               <button
-                onClick={() => {
-                  const id = [...checkedIds][0];
-                  if (id) setEditingTaskId(id);
-                }}
+                onClick={() => { const id = [...checkedIds][0]; if (id) setEditingTaskId(id); }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">edit</span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">Edit</span>
               </button>
               <button
                 onClick={open}
                 disabled={deleting}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  delete
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Delete
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">delete</span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">Delete</span>
               </button>
               <button
                 onClick={() => setCheckedIds(new Set())}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-stone-600 hover:bg-stone-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  close
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Clear
-                </span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">close</span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">Clear</span>
               </button>
             </div>
           </div>
@@ -791,10 +759,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         loading={deleting}
         title="Delete Task?"
         description={`Delete ${checkedIds.size > 1 ? `${checkedIds.size} tasks` : "this task"}? This cannot be undone.`}
-        onClose={() => {
-          close();
-          setDeleteId(null);
-        }}
+        onClose={() => { close(); setDeleteId(null); }}
         onConfirm={handleBulkDelete}
       />
 
@@ -815,6 +780,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       )}
     </div>
   );
-});
+};
 
-export default CalendarView;
+export default SpaceCalendarView;

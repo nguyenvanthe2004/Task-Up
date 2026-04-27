@@ -21,5 +21,6 @@ export interface List {
   icon: string;
   color: string;
   isPublic: boolean;
+  tasks: Task[];
   createdAt: Date;
 }
