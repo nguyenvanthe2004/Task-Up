@@ -40,6 +40,30 @@ export class TaskRepository {
           as: "assignees",
           attributes: ["id", "fullName", "email", "avatar"],
         },
+        {
+          model: Status,
+          as: "status",
+          attributes: ["id", "name", "color"],
+        },
+        {
+          model: List,
+          as: "list",
+          attributes: ["id", "name"],
+          include: [
+            {
+              model: Category,
+              as: "category",
+              attributes: ["id", "name"],
+              include: [
+                {
+                  model: Space,
+                  as: "space",
+                  attributes: ["id", "name"],
+                },
+              ],
+            },
+          ],
+        },
       ],
     });
   }

@@ -1,14 +1,25 @@
 import React, { useState } from "react";
-import { DetailTaskProps, Task } from "../../types/task";
-import { priorityMap, statusMap } from "../../constants";
+import dayjs from "dayjs";
+import { DetailTaskProps, Member } from "../../types/task";
+import { priorityBadge, priorityColor } from "../../constants";
+import { AvatarStack } from "../ui/AvatarStack";
 
-const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
-  const [activeTab, setActiveTab] = useState<"all" | "comments" | "history">("all");
+const DetailTask: React.FC<DetailTaskProps> = ({
+  task,
+  statuses = [],
+  onClose,
+  onUpdate,
+  onDelete,
+}) => {
+  const [activeTab, setActiveTab] = useState<"all" | "comments" | "history">(
+    "all",
+  );
   const [comment, setComment] = useState("");
   const [isStarred, setIsStarred] = useState(false);
 
-  const priority = priorityMap[task.priority] ?? priorityMap["Medium"];
-  const status   = statusMap[task.status]     ?? statusMap["Active"];
+  const status =
+    statuses.find((s) => s.id === task.statusId) ?? task.status?.[0] ?? null;
+  const priority = task.priority ?? null;
 
   const comments = [
     {
@@ -35,169 +46,235 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
 
       {/* Panel */}
       <div className="relative z-10 flex h-full w-full max-w-2xl flex-col border-l border-stone-200 bg-stone-50 shadow-2xl animate-slide-in-right">
-
-        {/* ── Header ─────────────────────────────────────────────── */}
+        {/* ── Header ── */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-stone-200 bg-white px-5">
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
               className="flex items-center justify-center rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
             >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+              <span className="material-symbols-outlined text-[20px]">
+                close
+              </span>
             </button>
             <div className="h-4 w-px bg-stone-200" />
+            {/* Breadcrumb */}
             <nav className="flex items-center gap-1 text-xs text-stone-400">
-              <span className="cursor-pointer transition-colors hover:text-stone-700">Marketing Ops</span>
-              <span className="material-symbols-outlined text-[14px] text-stone-300">chevron_right</span>
-              <span className="cursor-pointer font-medium text-stone-700 transition-colors hover:text-indigo-600">
-                Creative Assets
-              </span>
+              {task.list?.category?.space?.name && (
+                <>
+                  <span className="cursor-pointer transition-colors hover:text-stone-700">
+                    {task.list.category.space.name}
+                  </span>
+                  <span className="material-symbols-outlined text-[14px] text-stone-300">
+                    chevron_right
+                  </span>
+                </>
+              )}
+              {task.list?.category?.name && (
+                <>
+                  <span className="cursor-pointer transition-colors hover:text-stone-700">
+                    {task.list.category.name}
+                  </span>
+                  <span className="material-symbols-outlined text-[14px] text-stone-300">
+                    chevron_right
+                  </span>
+                </>
+              )}
+              {task.list?.name && (
+                <span className="cursor-pointer font-medium text-stone-700 transition-colors hover:text-indigo-600">
+                  {task.list.name}
+                </span>
+              )}
             </nav>
           </div>
 
           <div className="flex items-center gap-0.5">
             <button
               onClick={() => setIsStarred(!isStarred)}
-              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-stone-100 ${
-                isStarred ? "text-amber-400" : "text-stone-400"
-              }`}
+              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-stone-100 ${isStarred ? "text-amber-400" : "text-stone-400"}`}
             >
               <span
                 className="material-symbols-outlined text-[18px]"
-                style={{ fontVariationSettings: isStarred ? "'FILL' 1" : "'FILL' 0" }}
+                style={{
+                  fontVariationSettings: isStarred ? "'FILL' 1" : "'FILL' 0",
+                }}
               >
                 star
               </span>
             </button>
             <button className="flex items-center justify-center rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
-              <span className="material-symbols-outlined text-[18px]">ios_share</span>
+              <span className="material-symbols-outlined text-[18px]">
+                ios_share
+              </span>
             </button>
-            <button className="flex items-center justify-center rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
-              <span className="material-symbols-outlined text-[18px]">more_horiz</span>
-            </button>
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="flex items-center justify-center rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  delete
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── Body ───────────────────────────────────────────────── */}
+        {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto px-7 pt-7">
-
           {/* Title */}
           <div className="mb-6">
-            <div className="mb-2.5 flex items-center gap-2">
-              <span className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-[10px] font-medium tracking-widest text-indigo-600">
-                LUM-482
-              </span>
-              <span className="text-[11px] text-stone-300">·</span>
-              <span className="text-[11px] text-stone-400">Created 3 days ago</span>
-            </div>
             <h1 className="-tracking-wide text-xl font-semibold leading-snug text-stone-800">
               {task.name}
             </h1>
+            {task.createdAt && (
+              <p className="mt-1.5 text-[11px] text-stone-400">
+                Created {dayjs(task.createdAt).format("MMM D, YYYY")}
+              </p>
+            )}
           </div>
 
           {/* Meta grid */}
-          <div className="mb-7 grid grid-cols-3 gap-4 rounded-xl border border-stone-200 bg-white p-5">
-
+          <div className="mb-7 grid grid-cols-2 gap-4 rounded-xl border border-stone-200 bg-white p-5 sm:grid-cols-3">
+            {/* Assignees */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
-                Assignee
+                Assignees
               </label>
-              <div className="flex items-center gap-2">
-                <img
-                  src={task.avatar}
-                  alt={task.assignee}
-                  className="h-6 w-6 rounded-full border border-stone-200 object-cover"
-                />
-                <span className="text-[13px] font-medium text-stone-700">{task.assignee}</span>
-              </div>
+              {task.assignees && task.assignees.length > 0 ? (
+                <AvatarStack members={task.assignees} />
+              ) : (
+                <span className="text-[12px] text-stone-400">Unassigned</span>
+              )}
             </div>
 
+            {/* Due Date */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Due Date
               </label>
-              <div className="flex items-center gap-1.5 text-red-600">
-                <span className="material-symbols-outlined text-[15px]">calendar_today</span>
-                <span className="text-[13px] font-medium">{task.dueDate}</span>
-              </div>
+              {task.dueDate ? (
+                <div
+                  className={`flex items-center gap-1.5 ${dayjs(task.dueDate).isBefore(dayjs()) ? "text-red-500" : "text-stone-600"}`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">
+                    calendar_today
+                  </span>
+                  <span className="text-[13px] font-medium">
+                    {dayjs(task.dueDate).format("MMM D, YYYY")}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[12px] text-stone-400">No due date</span>
+              )}
             </div>
 
+            {/* Start Date */}
+            {task.startDate && (
+              <div>
+                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
+                  Start Date
+                </label>
+                <div className="flex items-center gap-1.5 text-stone-600">
+                  <span className="material-symbols-outlined text-[15px]">
+                    calendar_today
+                  </span>
+                  <span className="text-[13px] font-medium">
+                    {dayjs(task.startDate).format("MMM D, YYYY")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Priority */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Priority
               </label>
-              <div className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 ${priority.bg}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${priority.dot}`} />
-                <span className={`text-[12px] font-semibold ${priority.text}`}>{task.priority}</span>
-              </div>
+              {priority ? (
+                <div
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 ${priorityBadge[priority] ?? "bg-stone-50 text-stone-500"}`}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: priorityColor[priority] ?? "#78716c",
+                    }}
+                  />
+                  <span className="text-[12px] font-semibold capitalize">
+                    {priority}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[12px] text-stone-400">No priority</span>
+              )}
             </div>
 
+            {/* Status */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Status
               </label>
-              <div className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 ${status.bg} ${status.border}`}>
-                <span className={`material-symbols-outlined text-[13px] ${status.text}`}>{status.icon}</span>
-                <span className={`text-[12px] font-semibold ${status.text}`}>{task.status}</span>
-              </div>
+              {status ? (
+                <div
+                  className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1"
+                  style={{
+                    backgroundColor: `${status.color}18`,
+                    borderColor: `${status.color}30`,
+                    color: status.color,
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: status.color }}
+                  />
+                  <span className="text-[12px] font-semibold">
+                    {status.name}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[12px] text-stone-400">No status</span>
+              )}
             </div>
 
-            <div className="col-span-2">
-              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
-                Tags
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {["#DesignSystem", "#Handoff", "#Mobile"].map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-stone-500"
-                  >
-                    {tag}
-                  </span>
-                ))}
+            {/* Tag */}
+            {task.tag && (
+              <div>
+                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
+                  Tag
+                </label>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-500 text-[11px] font-semibold">
+                  #{task.tag}
+                </span>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Description */}
-          <section className="mb-7">
-            <div className="mb-3.5 flex items-center justify-between">
-              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
+          {task.description && (
+            <section className="mb-7">
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-stone-400">
                 Description
               </h3>
-              <button className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-colors hover:bg-indigo-50">
-                <span className="material-symbols-outlined text-[13px]">edit</span>
-                Edit
-              </button>
-            </div>
-            <div className="space-y-3 text-[13px] leading-relaxed text-stone-500">
-              <p>
-                The goal of this task is to synthesize the wireframes from the discovery phase into a
-                fully interactive, high-fidelity prototype using the{" "}
-                <strong className="font-semibold text-stone-700">Ethereal Architect</strong> design
-                system principles.
-              </p>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>Implementing the tonal layering hierarchy instead of using lines for containment.</li>
-                <li>Finalizing the glassmorphism effects for the modal notifications system.</li>
-                <li>Ensuring accessibility standards with the new primary color palette (Lumina Purple).</li>
-                <li>Testing micro-interactions for the task completion state transition.</li>
-              </ul>
-              <div className="rounded-r-lg border-l-[3px] border-violet-500 bg-violet-50 p-3 text-[13px] italic text-violet-700">
-                Note: Please coordinate with the backend team regarding the real-time data streaming
-                behavior for the activity feed widgets.
-              </div>
-            </div>
-          </section>
+
+              <div
+                className="text-[13px] leading-relaxed text-stone-600 break-words [&_*]:break-words"
+                dangerouslySetInnerHTML={{ __html: task.description }}
+              />
+            </section>
+          )}
 
           {/* Attachments */}
           <section className="mb-7">
             <div className="mb-3.5 flex items-center justify-between">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
-                Attachments <span className="font-normal text-stone-300">(4)</span>
+                Attachments{" "}
+                <span className="font-normal text-stone-300">(4)</span>
               </h3>
               <button className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-colors hover:bg-indigo-50">
-                <span className="material-symbols-outlined text-[13px]">add</span>
+                <span className="material-symbols-outlined text-[13px]">
+                  add
+                </span>
                 Add
               </button>
             </div>
@@ -218,13 +295,17 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
                 </div>
               ))}
               <div className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-red-50 transition-all hover:border-red-300 hover:shadow-md">
-                <span className="material-symbols-outlined text-[22px] text-red-400">description</span>
+                <span className="material-symbols-outlined text-[22px] text-red-400">
+                  description
+                </span>
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-red-500">
                   Specs.pdf
                 </span>
               </div>
               <div className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-emerald-50 transition-all hover:border-emerald-300 hover:shadow-md">
-                <span className="material-symbols-outlined text-[22px] text-emerald-500">table_chart</span>
+                <span className="material-symbols-outlined text-[22px] text-emerald-500">
+                  table_chart
+                </span>
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-emerald-600">
                   Budget.csv
                 </span>
@@ -258,9 +339,13 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
             {/* History pill */}
             <div className="mb-4 flex justify-center">
               <div className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400">
-                <span className="material-symbols-outlined text-[12px]">info</span>
+                <span className="material-symbols-outlined text-[12px]">
+                  info
+                </span>
                 Alex Thompson changed status to{" "}
-                <strong className="font-semibold text-stone-600">In Progress</strong>
+                <strong className="font-semibold text-stone-600">
+                  In Progress
+                </strong>
                 &nbsp;· 3 days ago
               </div>
             </div>
@@ -279,8 +364,12 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
                   />
                   <div className="flex-1">
                     <div className="mb-1.5 flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-stone-700">{c.name}</span>
-                      <span className="text-[11px] text-stone-400">{c.time}</span>
+                      <span className="text-[13px] font-semibold text-stone-700">
+                        {c.name}
+                      </span>
+                      <span className="text-[11px] text-stone-400">
+                        {c.time}
+                      </span>
                     </div>
                     <p className="mb-2 rounded-tr-xl rounded-b-xl border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-stone-500">
                       {c.text}
@@ -301,7 +390,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
           </section>
         </div>
 
-        {/* ── Comment Input ───────────────────────────────────────── */}
+        {/* ── Comment Input ── */}
         <div className="shrink-0 border-t border-stone-200 bg-white px-7 py-4">
           <div className="flex items-end gap-2.5">
             <textarea
@@ -321,7 +410,9 @@ const DetailTask: React.FC<DetailTaskProps> = ({ task, onClose }) => {
               onClick={() => setComment("")}
               className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-800 text-white transition-all hover:scale-105 hover:bg-stone-700 active:scale-95"
             >
-              <span className="material-symbols-outlined text-[18px]">send</span>
+              <span className="material-symbols-outlined text-[18px]">
+                send
+              </span>
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-stone-400">

@@ -18,14 +18,15 @@ import { AvatarStack } from "../ui/AvatarStack";
 import { fmtDate } from "../../lib/until";
 import { useModal } from "../../hook/useModal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
-import { GRID_COLS, InlineCreateRow } from "../tasks/InlineCreateRow";
-import InlineEditRow from "../tasks/InlineEditRow";
-import BulkStatusModal from "../tasks/BulkStatusModal";
-import BulkAssignModal from "../tasks/BulkAssignModal";
+
 import DetailTask from "../tasks/DetailTask";
 import { Category } from "../../types/category";
 import { List } from "../../types/list";
 import NotFound from "../ui/NotFound";
+import { GRID_COLS, InlineCreateRow } from "../tools/InlineCreateRow";
+import InlineEditRow from "../tools/InlineEditRow";
+import BulkStatusModal from "../tools/BulkStatusModal";
+import BulkAssignModal from "../tools/BulkAssignModal";
 
 
 interface StatusGroup {
@@ -161,15 +162,15 @@ const SpaceListView: React.FC = () => {
       setBulkActionLoading(true);
       await Promise.all(
         [...checkedIds].map((id) =>
-          callUpdateTask(id, { assigneeIds: memberIds } as UpdateTask),
+          callUpdateTask(id, { assignees: memberIds } as UpdateTask),
         ),
       );
       toastSuccess("Assigned successfully.");
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
       await fetchData();
-    } catch {
-      toastError("Failed to assign.");
+    } catch(error: any) {
+      toastError(error.message);
     } finally {
       setBulkActionLoading(false);
     }
@@ -611,6 +612,17 @@ const SpaceListView: React.FC = () => {
                 <span className="material-symbols-outlined text-[18px] text-stone-400">delete</span>
                 <span className="text-[9px] font-bold uppercase text-stone-400">Delete</span>
               </button>
+              <button
+                onClick={() => setCheckedIds(new Set())}
+                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-400 hover:bg-red-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  close
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Close
+                </span>
+              </button>
             </div>
           </div>
         </>
@@ -628,6 +640,7 @@ const SpaceListView: React.FC = () => {
       {selected && (
         <DetailTask
           task={selected}
+          statuses={statuses}
           onClose={() => setSelected(null)}
           onUpdate={(data: UpdateTask) => handleUpdate(selected.id, data)}
           onDelete={() => { setDeleteId(selected.id); }}

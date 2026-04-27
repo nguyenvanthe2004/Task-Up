@@ -1,11 +1,16 @@
-import React, { useState, useCallback } from "react";
+import React, {
+  useState,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { Member, Task, UpdateTask } from "../../types/task";
+import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
 import DetailTask from "./DetailTask";
 import { priorityBadge, PriorityStatus } from "../../constants";
@@ -22,15 +27,15 @@ import { AvatarStack } from "../ui/AvatarStack";
 import { fmtDate } from "../../lib/until";
 import { useModal } from "../../hook/useModal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
-import { GRID_COLS, InlineCreateRow } from "./InlineCreateRow";
 
 import { useEffect } from "react";
-import InlineEditRow from "./InlineEditRow";
-import BulkStatusModal from "./BulkStatusModal";
-import BulkAssignModal from "./BulkAssignModal";
+import { GRID_COLS, InlineCreateRow } from "../tools/InlineCreateRow";
+import InlineEditRow from "../tools/InlineEditRow";
+import BulkStatusModal from "../tools/BulkStatusModal";
+import BulkAssignModal from "../tools/BulkAssignModal";
 
-const ListView: React.FC = () => {
-  const { listId, spaceId } = useParams<{ listId: string, spaceId: string }>();
+const ListView = forwardRef<ListViewHandle>((_, ref) => {
+  const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -83,6 +88,11 @@ const ListView: React.FC = () => {
     }
   }, [listId, spaceId]);
 
+  useImperativeHandle(ref, () => ({
+    refresh: fetchData,
+    getTasks: () => groups.flatMap((g) => g.tasks),
+  }));
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -116,7 +126,9 @@ const ListView: React.FC = () => {
     try {
       setBulkActionLoading(true);
       await Promise.all(
-        [...checkedIds].map((id) => callUpdateTask(id, { statusId } as UpdateTask)),
+        [...checkedIds].map((id) =>
+          callUpdateTask(id, { statusId } as UpdateTask),
+        ),
       );
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
@@ -141,8 +153,8 @@ const ListView: React.FC = () => {
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
       await fetchData();
-    } catch {
-      toastError("Failed to assign.");
+    } catch (error: any) {
+      toastError(error.message);
     } finally {
       setBulkActionLoading(false);
     }
@@ -528,6 +540,17 @@ const ListView: React.FC = () => {
                   Delete
                 </span>
               </button>
+              <button
+                onClick={() => setCheckedIds(new Set())}
+                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-400 hover:bg-red-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  close
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Close
+                </span>
+              </button>
             </div>
           </div>
         </>
@@ -549,6 +572,7 @@ const ListView: React.FC = () => {
       {selected && (
         <DetailTask
           task={selected}
+          statuses={statuses}
           onClose={() => setSelected(null)}
           onUpdate={(data: UpdateTask) => handleUpdate(selected.id, data)}
           onDelete={() => {
@@ -558,6 +582,6 @@ const ListView: React.FC = () => {
       )}
     </div>
   );
-};
+});
 
 export default ListView;

@@ -22,8 +22,16 @@ export enum PriorityStatus {
 
 export const priorityBadge: Record<string, string> = {
   High: "bg-red-50 text-red-700",
-  Medium: "bg-amber-50 text-amber-700",
+  Normal: "bg-amber-50 text-amber-700",
   Low: "bg-emerald-50 text-emerald-700",
+  Urgent: "bg-purple-50 text-purple-700",
+};
+
+export const priorityColor: Record<string, string> = {
+  Urgent: "#7c3aed",
+  High: "#b91c1c",
+  Normal: "#b45309",
+  Low: "#047857",
 };
 
 export const statusBadge: Record<string, string> = {
@@ -47,6 +55,25 @@ export const statusMap: Record<string, { icon: string; text: string; bg: string;
 };
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export const QUILL_MODULES = {
+  toolbar: [
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["clean"],
+  ],
+};
+
+export const QUILL_FORMATS = [
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "list",
+  "bullet",
+];
+
+export const today = new Date().toISOString().split("T")[0];
 
 
 

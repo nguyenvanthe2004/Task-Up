@@ -39,7 +39,7 @@ export class CreateTaskDto {
   dueDate?: string;
 
   @IsNumber()
-  statusId!: number;
+  statusId?: number;
 
   @IsNumber()
   listId!: number;

@@ -12,7 +12,7 @@ export enum PriorityStatus {
 interface TaskAttributes {
   id: number;
   name: string;
-  description: string; // react quill
+  description: string;
   priority?: PriorityStatus;
   tag?: string;
   startDate?: Date;
