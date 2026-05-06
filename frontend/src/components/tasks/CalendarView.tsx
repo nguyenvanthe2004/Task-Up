@@ -92,7 +92,9 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
+      );
     } catch {
       toastError("Failed to update.");
     }
@@ -105,7 +107,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       toastSuccess(`${checkedIds.size} tasks deleted!`);
       close();
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) => prev.filter((t) => !checkedIds.has(t.id)));
     } catch {
       toastError("Failed to delete.");
     } finally {
@@ -115,6 +117,7 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
   const handleBulkStatus = async (statusId: number) => {
     try {
+      const ids = [...checkedIds];
       setBulkActionLoading(true);
       await Promise.all(
         [...checkedIds].map((id) =>
@@ -124,7 +127,9 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (ids.includes(t.id) ? { ...t, statusId } : t)),
+      );
     } catch {
       toastError("Failed.");
     } finally {
@@ -143,7 +148,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
       toastSuccess("Assigned.");
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) =>
+          checkedIds.has(t.id) ? { ...t, assigneeIds: memberIds } : t,
+        ),
+      );
     } catch {
       toastError("Failed.");
     } finally {
@@ -160,14 +169,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     });
   };
 
-  // Tasks for a given date string yyyy-mm-dd
   const tasksForDate = (dateStr: string) =>
     tasks.filter((t) => t.dueDate && t.dueDate.slice(0, 10) === dateStr);
 
-  // Unscheduled = no dueDate
   const unscheduled = tasks.filter((t) => !t.dueDate);
 
-  // Drag drop: update dueDate
   const handleDropOnCell = (dateStr: string) => {
     if (!dragId) return;
     handleUpdate(dragId, { dueDate: dateStr } as UpdateTask);
@@ -176,7 +182,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
 
   const firstStatusId = statuses[0]?.id;
 
-  // ── Render pill ─────────────────────────────────────────────────────────────
   const renderPill = (task: Task, compact = false) => {
     const status = statuses.find((s) => s.id === task.statusId);
     const isChecked = checkedIds.has(task.id);

@@ -5,7 +5,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import { useEffect, useState } from "react";
 import { callGetCurrentUser } from "./services/auth";
 import { setCurrentUser } from "./redux/slices/currentUser";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import GithubCallback from "./components/auth/GitHubCallBack";
 import HomePage from "./pages/home/HomePage";
 import MyTaskPage from "./pages/tasks/MyTaskPage";
@@ -18,18 +18,18 @@ import MemberPage from "./pages/workspace/MemberPage";
 import LoadingPage from "./components/ui/LoadingPage";
 import PrivateRoute from "./components/PrivateRoute";
 import ListDetailPage from "./pages/lists/ListDetailPage";
+import { RootState } from "./redux/store";
 
 function App() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const currentUser = useSelector((state: RootState) => state.auth.currentUser);
+  const isAuthenticated = !!currentUser;
   const fetchCurrentUser = async () => {
     try {
       const res = await callGetCurrentUser();
       dispatch(setCurrentUser(res.data));
-      setIsAuthenticated(true);
     } catch {
-      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }

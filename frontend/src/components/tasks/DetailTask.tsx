@@ -1,8 +1,42 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { DetailTaskProps, Member } from "../../types/task";
+import { DetailTaskProps } from "../../types/task";
 import { priorityBadge, priorityColor } from "../../constants";
 import { AvatarStack } from "../ui/AvatarStack";
+import { Comment } from "../../types/comment";
+import { toastError, toastSuccess } from "../../lib/toast";
+import {
+  callCreateComment,
+  callDeleteComment,
+  callGetComments,
+  callUpdateComment,
+} from "../../services/comment";
+import { useForm } from "react-hook-form";
+import {
+  CreateCommentFormData,
+  CreateCommentSchema,
+  UpdateCommentFormData,
+  UpdateCommentSchema,
+} from "../../validations/comment";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { normalizeImg } from "../../lib/until";
+import EllipsisMenu from "../ui/EllipsisMenu";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+import { Pencil, Trash2 } from "lucide-react";
+
+const ATTACHMENT_IMAGES = [
+  {
+    key: "attachment-img-0",
+    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuDnDCRfqEjazffln1iVinE4lFu7ACzVJmx38KwLLF5ogLb3ByO9RhJ6VWvf-8mKGOvaedaVmcEoX8vw8lOTetsSxAmZwC7uDpUwzf6xQU05RspGKvaOWH7EZM2weYehc-eNUoTRhxkwgu0FC7dko3B2B5gr6zT0UnGUFl9ufesYLA3cLxlvP1Qi-Km65eAH7QeB1Uc2gtsJvWUoyhD_pKijuT_bTM7yygbk_t6ohfxn08y6hR98E2aSz9F5gVBonvdndy3wY4r5224",
+    alt: "Design 1",
+  },
+  {
+    key: "attachment-img-1",
+    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuBhA7LMY0TIbq6q5sSikMdUiDE1VdniXnHGGETpBxLvi4eAVcIaZMU7bK6PDl6I8ARn-FWWOuzKqLEwPurtedzmMHvL3XiWCMynwkWBCWTKqxsxuIWKZ3r3d6MSIQ0CV4KI3TZRcQ6Z961vvKfrnfcExE5yqRUybuHM1mc77Q8V_2JXd4SYtpnS_Ewam-kGqVvn0VMWNJPGjkBZbOhuTNIllwbfVGBLonXvPshUd5DNJsU-Ia7_fWrVmez0JB_KFubkGtu5r66tgEE",
+    alt: "Design 2",
+  },
+];
 
 const DetailTask: React.FC<DetailTaskProps> = ({
   task,
@@ -14,37 +48,131 @@ const DetailTask: React.FC<DetailTaskProps> = ({
   const [activeTab, setActiveTab] = useState<"all" | "comments" | "history">(
     "all",
   );
-  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
   const [isStarred, setIsStarred] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(
+    null,
+  );
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const status =
     statuses.find((s) => s.id === task.statusId) ?? task.status?.[0] ?? null;
   const priority = task.priority ?? null;
 
-  const comments = [
-    {
-      name: "Marcus Chen",
-      time: "2 hours ago",
-      text: 'Hey team, I\'ve updated the iconography set to match the new weight specs. Let me know if the "Task" icon feels too thin in the sidebar context.',
-      avatar: "https://i.pravatar.cc/100?img=5",
-    },
-    {
-      name: "Sarah Jenkins",
-      time: "45 mins ago",
-      text: "The icons look great, Marcus. Alex will review the mobile responsiveness by EOD tomorrow.",
-      avatar: "https://i.pravatar.cc/100?img=9",
-    },
-  ];
+  const currentUser = useSelector((state: RootState) => state.auth.currentUser);
+
+  const {
+    register: registerCreate,
+    handleSubmit: handleSubmitCreate,
+    reset: resetCreate,
+    formState: { errors: createErrors },
+  } = useForm<CreateCommentFormData>({
+    resolver: zodResolver(CreateCommentSchema),
+    defaultValues: { content: "", taskId: task.id },
+  });
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    setValue: setEditValue,
+    formState: { errors: editErrors },
+  } = useForm<UpdateCommentFormData>({
+    resolver: zodResolver(UpdateCommentSchema),
+    defaultValues: { content: "" },
+  });
+
+  const fetchComments = async () => {
+    try {
+      const res = await callGetComments(task.id);
+      setComments(res.data);
+    } catch (error: any) {
+      toastError(error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [task]);
+
+  useEffect(() => {
+    if (editingCommentId !== null && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+      const len = editTextareaRef.current.value.length;
+      editTextareaRef.current.setSelectionRange(len, len);
+    }
+  }, [editingCommentId]);
+
+  const onSubmitCreate = async (data: CreateCommentFormData) => {
+    try {
+      setLoading(true);
+      const res = await callCreateComment({ ...data, taskId: task.id });
+      const newComment: Comment = {
+        ...res.data.dataValues,
+        user: currentUser,
+      };
+      setComments((prev) => [...prev, newComment]);
+      resetCreate({ content: "", taskId: task.id });
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditValue("content", comment.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingCommentId(null);
+    resetEdit();
+  };
+
+  const onSubmitEdit = async (data: UpdateCommentFormData) => {
+    if (editingCommentId === null) return;
+    try {
+      setLoading(true);
+      const res = await callUpdateComment(editingCommentId, data);
+      const updatedComment: Comment = {
+        ...res.data.dataValues,
+        user: currentUser,
+      };
+      setComments((prev) =>
+        prev.map((c) => (c.id === editingCommentId ? updatedComment : c)),
+      );
+      setEditingCommentId(null);
+      resetEdit();
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteComment = async (id: number) => {
+    try {
+      setDeletingCommentId(id);
+      await callDeleteComment(id);
+      setComments((prev) => prev.filter((c) => c.id !== id));
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div className="relative z-10 flex h-full w-full max-w-2xl flex-col border-l border-stone-200 bg-stone-50 shadow-2xl animate-slide-in-right">
         {/* ── Header ── */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-stone-200 bg-white px-5">
@@ -58,7 +186,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               </span>
             </button>
             <div className="h-4 w-px bg-stone-200" />
-            {/* Breadcrumb */}
             <nav className="flex items-center gap-1 text-xs text-stone-400">
               {task.list?.category?.space?.name && (
                 <>
@@ -120,9 +247,8 @@ const DetailTask: React.FC<DetailTaskProps> = ({
           </div>
         </div>
 
-        {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto px-7 pt-7">
-          {/* Title */}
+          {/* ── Title ── */}
           <div className="mb-6">
             <h1 className="-tracking-wide text-xl font-semibold leading-snug text-stone-800">
               {task.name}
@@ -134,9 +260,8 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             )}
           </div>
 
-          {/* Meta grid */}
+          {/* ── Meta Grid ── */}
           <div className="mb-7 grid grid-cols-2 gap-4 rounded-xl border border-stone-200 bg-white p-5 sm:grid-cols-3">
-            {/* Assignees */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Assignees
@@ -148,7 +273,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               )}
             </div>
 
-            {/* Due Date */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Due Date
@@ -169,7 +293,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               )}
             </div>
 
-            {/* Start Date */}
             {task.startDate && (
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
@@ -186,7 +309,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               </div>
             )}
 
-            {/* Priority */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Priority
@@ -210,7 +332,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               )}
             </div>
 
-            {/* Status */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
                 Status
@@ -237,7 +358,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               )}
             </div>
 
-            {/* Tag */}
             {task.tag && (
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-stone-400">
@@ -250,13 +370,12 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             )}
           </div>
 
-          {/* Description */}
+          {/* ── Description ── */}
           {task.description && (
             <section className="mb-7">
               <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-stone-400">
                 Description
               </h3>
-
               <div
                 className="text-[13px] leading-relaxed text-stone-600 break-words [&_*]:break-words"
                 dangerouslySetInnerHTML={{ __html: task.description }}
@@ -264,7 +383,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             </section>
           )}
 
-          {/* Attachments */}
+          {/* ── Attachments ── */}
           <section className="mb-7">
             <div className="mb-3.5 flex items-center justify-between">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
@@ -278,23 +397,26 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                 Add
               </button>
             </div>
+
+            {/* FIX: tất cả children trong grid này đều có key rõ ràng */}
             <div className="grid grid-cols-4 gap-2.5">
-              {[
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuDnDCRfqEjazffln1iVinE4lFu7ACzVJmx38KwLLF5ogLb3ByO9RhJ6VWvf-8mKGOvaedaVmcEoX8vw8lOTetsSxAmZwC7uDpUwzf6xQU05RspGKvaOWH7EZM2weYehc-eNUoTRhxkwgu0FC7dko3B2B5gr6zT0UnGUFl9ufesYLA3cLxlvP1Qi-Km65eAH7QeB1Uc2gtsJvWUoyhD_pKijuT_bTM7yygbk_t6ohfxn08y6hR98E2aSz9F5gVBonvdndy3wY4r5224",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuBhA7LMY0TIbq6q5sSikMdUiDE1VdniXnHGGETpBxLvi4eAVcIaZMU7bK6PDl6I8ARn-FWWOuzKqLEwPurtedzmMHvL3XiWCMynwkWBCWTKqxsxuIWKZ3r3d6MSIQ0CV4KI3TZRcQ6Z961vvKfrnfcExE5yqRUybuHM1mc77Q8V_2JXd4SYtpnS_Ewam-kGqVvn0VMWNJPGjkBZbOhuTNIllwbfVGBLonXvPshUd5DNJsU-Ia7_fWrVmez0JB_KFubkGtu5r66tgEE",
-              ].map((src, i) => (
+              {ATTACHMENT_IMAGES.map((img) => (
                 <div
-                  key={i}
+                  key={img.key}
                   className="group aspect-video cursor-pointer overflow-hidden rounded-xl border border-stone-200 transition-all hover:border-stone-400 hover:shadow-md"
                 >
                   <img
-                    src={src}
-                    alt={`Design ${i + 1}`}
+                    src={img.src}
+                    alt={img.alt}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 </div>
               ))}
-              <div className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-red-50 transition-all hover:border-red-300 hover:shadow-md">
+
+              <div
+                key="attachment-specs-pdf"
+                className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-red-50 transition-all hover:border-red-300 hover:shadow-md"
+              >
                 <span className="material-symbols-outlined text-[22px] text-red-400">
                   description
                 </span>
@@ -302,7 +424,11 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                   Specs.pdf
                 </span>
               </div>
-              <div className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-emerald-50 transition-all hover:border-emerald-300 hover:shadow-md">
+
+              <div
+                key="attachment-budget-csv"
+                className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-emerald-50 transition-all hover:border-emerald-300 hover:shadow-md"
+              >
                 <span className="material-symbols-outlined text-[22px] text-emerald-500">
                   table_chart
                 </span>
@@ -313,16 +439,17 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             </div>
           </section>
 
-          {/* Activity */}
+          {/* ── Activity ── */}
           <section className="mb-0">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
                 Activity
               </h3>
               <div className="flex gap-1">
+                {/* FIX: key trên mỗi button trong map */}
                 {(["all", "comments", "history"] as const).map((tab) => (
                   <button
-                    key={tab}
+                    key={`tab-${tab}`}
                     onClick={() => setActiveTab(tab)}
                     className={`rounded-md px-3 py-1.5 text-[11px] font-medium capitalize transition-all ${
                       activeTab === tab
@@ -336,96 +463,190 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               </div>
             </div>
 
-            {/* History pill */}
-            <div className="mb-4 flex justify-center">
-              <div className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400">
-                <span className="material-symbols-outlined text-[12px]">
-                  info
-                </span>
-                Alex Thompson changed status to{" "}
-                <strong className="font-semibold text-stone-600">
-                  In Progress
-                </strong>
-                &nbsp;· 3 days ago
+            {(activeTab === "all" || activeTab === "history") && (
+              <div className="mb-4 flex justify-center">
+                <div className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400">
+                  <span className="material-symbols-outlined text-[12px]">
+                    info
+                  </span>
+                  Alex Thompson changed status to{" "}
+                  <strong className="font-semibold text-stone-600">
+                    In Progress
+                  </strong>
+                  &nbsp;· 3 days ago
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Comments */}
-            <div className="flex flex-col gap-1">
-              {comments.map((c, i) => (
-                <div
-                  key={i}
-                  className="flex gap-3 rounded-xl p-2.5 transition-colors hover:bg-stone-100"
-                >
-                  <img
-                    src={c.avatar}
-                    alt={c.name}
-                    className="h-8 w-8 shrink-0 rounded-full border border-stone-200 object-cover"
-                  />
-                  <div className="flex-1">
-                    <div className="mb-1.5 flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-stone-700">
-                        {c.name}
-                      </span>
-                      <span className="text-[11px] text-stone-400">
-                        {c.time}
-                      </span>
-                    </div>
-                    <p className="mb-2 rounded-tr-xl rounded-b-xl border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-stone-500">
-                      {c.text}
-                    </p>
-                    <div className="flex gap-0.5">
-                      <button className="rounded px-2 py-0.5 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
-                        Reply
-                      </button>
-                      <button className="rounded px-2 py-0.5 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
-                        👍 Like
-                      </button>
+            {(activeTab === "all" || activeTab === "comments") && (
+              <div className="flex flex-col gap-1">
+                {comments.length === 0 && (
+                  <p className="py-6 text-center text-[12px] text-stone-400">
+                    No comments yet. Be the first to comment!
+                  </p>
+                )}
+
+                {/* FIX: key dùng string rõ ràng, tránh trường hợp id undefined */}
+                {comments.map((c) => (
+                  <div
+                    key={`comment-${c.id}`}
+                    className="group flex gap-3 rounded-xl p-2.5 transition-colors hover:bg-stone-100"
+                  >
+                    <img
+                      src={normalizeImg(c.user?.avatar)}
+                      alt={c.user?.fullName}
+                      className="h-8 w-8 shrink-0 rounded-full border border-stone-200 object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold text-stone-700">
+                            {c.user?.fullName}
+                          </span>
+                          {c.createdAt && (
+                            <span className="text-[11px] text-stone-400">
+                              {dayjs(c.createdAt).format("MMM D, YYYY · HH:mm")}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <EllipsisMenu
+                            actions={[
+                              {
+                                label: "Edit",
+                                icon: <Pencil className="w-4 h-4" />,
+                                onClick: () => startEdit(c),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash2 className="w-4 h-4" />,
+                                onClick: () => handleDeleteComment(c.id),
+                                variant: "danger",
+                              },
+                            ]}
+                            align="right"
+                          />
+                        </div>
+                      </div>
+
+                      {/* ── Inline edit mode ── */}
+                      {editingCommentId === c.id ? (
+                        <form onSubmit={handleSubmitEdit(onSubmitEdit)}>
+                          <textarea
+                            {...registerEdit("content")}
+                            ref={(el) => {
+                              registerEdit("content").ref(el);
+                              (
+                                editTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+                              ).current = el;
+                            }}
+                            rows={3}
+                            className="w-full resize-none rounded-xl border border-indigo-300 bg-white px-3.5 py-2.5 text-[13px] text-stone-700 placeholder:text-stone-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          />
+                          {editErrors.content && (
+                            <p className="mt-1 text-[11px] text-red-500">
+                              {editErrors.content.message}
+                            </p>
+                          )}
+                          <div className="mt-2 flex gap-1.5">
+                            <button
+                              type="submit"
+                              disabled={loading}
+                              className="flex items-center gap-1 rounded-lg bg-stone-800 px-3 py-1.5 text-[11px] font-semibold text-white transition-all hover:bg-stone-700 disabled:opacity-50"
+                            >
+                              {loading ? (
+                                <span className="material-symbols-outlined animate-spin text-[13px]">
+                                  progress_activity
+                                </span>
+                              ) : (
+                                <span className="material-symbols-outlined text-[13px]">
+                                  check
+                                </span>
+                              )}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition-all hover:bg-stone-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <p className="mb-2 rounded-tr-xl rounded-b-xl border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-stone-500">
+                            {c.content}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+
             <div className="h-7" />
           </section>
         </div>
 
         {/* ── Comment Input ── */}
         <div className="shrink-0 border-t border-stone-200 bg-white px-7 py-4">
-          <div className="flex items-end gap-2.5">
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Add a comment…"
-              rows={1}
-              className="flex-1 resize-none rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2.5 text-[13px] text-stone-700 placeholder:text-stone-400 transition-all focus:border-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-800/10"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  setComment("");
-                }
-              }}
-            />
-            <button
-              onClick={() => setComment("")}
-              className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-800 text-white transition-all hover:scale-105 hover:bg-stone-700 active:scale-95"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                send
-              </span>
-            </button>
-          </div>
-          <p className="mt-1.5 text-[11px] text-stone-400">
-            Press{" "}
-            <kbd className="rounded border border-stone-200 bg-stone-100 px-1 py-0.5 font-mono text-[10px]">
-              Enter
-            </kbd>{" "}
-            to send ·{" "}
-            <kbd className="rounded border border-stone-200 bg-stone-100 px-1 py-0.5 font-mono text-[10px]">
-              Shift+Enter
-            </kbd>{" "}
-            for new line
-          </p>
+          <form onSubmit={handleSubmitCreate(onSubmitCreate)}>
+            <div className="flex items-end gap-2.5">
+              <div className="flex-1">
+                <textarea
+                  {...registerCreate("content")}
+                  placeholder="Add a comment…"
+                  rows={1}
+                  className={`w-full resize-none rounded-xl border bg-stone-50 px-3.5 py-2.5 text-[13px] text-stone-700 placeholder:text-stone-400 transition-all focus:outline-none focus:ring-2 ${
+                    createErrors.content
+                      ? "border-red-300 focus:border-red-400 focus:ring-red-400/10"
+                      : "border-stone-200 focus:border-stone-800 focus:ring-stone-800/10"
+                  }`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmitCreate(onSubmitCreate)();
+                    }
+                  }}
+                />
+                {createErrors.content && (
+                  <p className="mt-1 text-[11px] text-red-500">
+                    {createErrors.content.message}
+                  </p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-800 text-white transition-all hover:scale-105 hover:bg-stone-700 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                {loading ? (
+                  <span className="material-symbols-outlined animate-spin text-[18px]">
+                    progress_activity
+                  </span>
+                ) : (
+                  <span className="material-symbols-outlined text-[18px]">
+                    send
+                  </span>
+                )}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-stone-400">
+              Press{" "}
+              <kbd className="rounded border border-stone-200 bg-stone-100 px-1 py-0.5 font-mono text-[10px]">
+                Enter
+              </kbd>{" "}
+              to send ·{" "}
+              <kbd className="rounded border border-stone-200 bg-stone-100 px-1 py-0.5 font-mono text-[10px]">
+                Shift+Enter
+              </kbd>{" "}
+              for new line
+            </p>
+          </form>
         </div>
       </div>
     </div>

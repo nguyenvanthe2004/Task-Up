@@ -55,7 +55,9 @@ const SpaceCalendarView: React.FC = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(
+    new Set(),
+  );
 
   const [activeListId, setActiveListId] = useState<number | null>(null);
 
@@ -100,12 +102,16 @@ const SpaceCalendarView: React.FC = () => {
     }
   }, [spaceId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
+      );
     } catch {
       toastError("Failed to update.");
     }
@@ -119,7 +125,7 @@ const SpaceCalendarView: React.FC = () => {
       toastSuccess(`${checkedIds.size} tasks deleted!`);
       close();
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) => prev.filter((t) => !checkedIds.has(t.id)));
     } catch {
       toastError("Failed to delete.");
     } finally {
@@ -129,12 +135,19 @@ const SpaceCalendarView: React.FC = () => {
 
   const handleBulkStatus = async (statusId: number) => {
     try {
+      const ids = [...checkedIds];
       setBulkActionLoading(true);
-      await Promise.all([...checkedIds].map((id) => callUpdateTask(id, { statusId } as UpdateTask)));
+      await Promise.all(
+        [...checkedIds].map((id) =>
+          callUpdateTask(id, { statusId } as UpdateTask),
+        ),
+      );
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (ids.includes(t.id) ? { ...t, statusId } : t)),
+      );
     } catch {
       toastError("Failed.");
     } finally {
@@ -145,11 +158,19 @@ const SpaceCalendarView: React.FC = () => {
   const handleBulkAssign = async (memberIds: number[]) => {
     try {
       setBulkActionLoading(true);
-      await Promise.all([...checkedIds].map((id) => callUpdateTask(id, { assignees: memberIds } as UpdateTask)));
+      await Promise.all(
+        [...checkedIds].map((id) =>
+          callUpdateTask(id, { assignees: memberIds } as UpdateTask),
+        ),
+      );
       toastSuccess("Assigned.");
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) =>
+          checkedIds.has(t.id) ? { ...t, assigneeIds: memberIds } : t,
+        ),
+      );
     } catch {
       toastError("Failed.");
     } finally {
@@ -179,10 +200,15 @@ const SpaceCalendarView: React.FC = () => {
 
   const tasksForDate = (dateStr: string) =>
     visibleTasks.filter(
-      (t) => t.dueDate && t.dueDate.trim() !== "" && t.dueDate.slice(0, 10) === dateStr
+      (t) =>
+        t.dueDate &&
+        t.dueDate.trim() !== "" &&
+        t.dueDate.slice(0, 10) === dateStr,
     );
 
-  const unscheduled = visibleTasks.filter((t) => !t.dueDate || t.dueDate.trim() === "");
+  const unscheduled = visibleTasks.filter(
+    (t) => !t.dueDate || t.dueDate.trim() === "",
+  );
 
   const handleDropOnCell = (dateStr: string) => {
     if (!dragId) return;
@@ -192,18 +218,23 @@ const SpaceCalendarView: React.FC = () => {
 
   const firstStatusId = statuses[0]?.id;
 
-  const activeList = activeListId ? lists.find((l) => l.id === activeListId) : null;
+  const activeList = activeListId
+    ? lists.find((l) => l.id === activeListId)
+    : null;
 
-  const listsByCategory = lists.reduce<Record<number, { catName: string; catId: number; lists: ListFlat[] }>>(
-    (acc, list) => {
-      if (!acc[list.categoryId]) {
-        acc[list.categoryId] = { catName: list.categoryName, catId: list.categoryId, lists: [] };
-      }
-      acc[list.categoryId].lists.push(list);
-      return acc;
-    },
-    {}
-  );
+  const listsByCategory = lists.reduce<
+    Record<number, { catName: string; catId: number; lists: ListFlat[] }>
+  >((acc, list) => {
+    if (!acc[list.categoryId]) {
+      acc[list.categoryId] = {
+        catName: list.categoryName,
+        catId: list.categoryId,
+        lists: [],
+      };
+    }
+    acc[list.categoryId].lists.push(list);
+    return acc;
+  }, {});
 
   const renderPill = (task: Task) => {
     const status = statuses.find((s) => s.id === task.statusId);
@@ -227,9 +258,15 @@ const SpaceCalendarView: React.FC = () => {
       <div
         key={task.id}
         draggable
-        onDragStart={(e) => { e.stopPropagation(); setDragId(task.id); }}
+        onDragStart={(e) => {
+          e.stopPropagation();
+          setDragId(task.id);
+        }}
         onDragEnd={() => setDragId(null)}
-        onClick={(e) => { e.stopPropagation(); setSelected(task); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelected(task);
+        }}
         className={`
           group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md cursor-pointer
           hover:opacity-90 transition-all text-[10px] font-semibold truncate border-l-2
@@ -261,11 +298,24 @@ const SpaceCalendarView: React.FC = () => {
         )}
 
         <button
-          onClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingTaskId(task.id);
+          }}
           className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
         >
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+          <svg
+            className="w-2.5 h-2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+            />
           </svg>
         </button>
       </div>
@@ -275,11 +325,17 @@ const SpaceCalendarView: React.FC = () => {
   // ── Skeleton ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="w-full mt-4 rounded-xl border border-stone-200/60 bg-white/60 animate-pulse" style={{ minHeight: "calc(100vh - 200px)" }}>
+      <div
+        className="w-full mt-4 rounded-xl border border-stone-200/60 bg-white/60 animate-pulse"
+        style={{ minHeight: "calc(100vh - 200px)" }}
+      >
         <div className="h-12 border-b border-stone-100 bg-stone-50/80 rounded-t-xl" />
         <div className="grid grid-cols-7">
           {Array.from({ length: 35 }).map((_, i) => (
-            <div key={i} className="border-r border-b border-stone-100 p-2 min-h-[100px]">
+            <div
+              key={i}
+              className="border-r border-b border-stone-100 p-2 min-h-[100px]"
+            >
               <div className="w-5 h-5 rounded-full bg-stone-200 mb-2" />
               <div className="space-y-1">
                 <div className="h-3 rounded bg-stone-100" />
@@ -300,7 +356,6 @@ const SpaceCalendarView: React.FC = () => {
     >
       {/* ── Calendar main ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 bg-white/80 flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -309,8 +364,18 @@ const SpaceCalendarView: React.FC = () => {
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
               title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h10M4 18h16"
+                />
               </svg>
             </button>
 
@@ -318,8 +383,18 @@ const SpaceCalendarView: React.FC = () => {
               onClick={() => setCurrent((c) => c.subtract(1, "month"))}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
 
@@ -331,8 +406,18 @@ const SpaceCalendarView: React.FC = () => {
               onClick={() => setCurrent((c) => c.add(1, "month"))}
               className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
 
@@ -355,8 +440,18 @@ const SpaceCalendarView: React.FC = () => {
                   onClick={() => setActiveListId(null)}
                   className="text-indigo-400 hover:text-indigo-600 transition-colors"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -365,7 +460,9 @@ const SpaceCalendarView: React.FC = () => {
             <div className="flex items-center gap-3 text-[11px] font-medium text-stone-400">
               <span>{visibleTasks.length} tasks</span>
               <span className="text-stone-200">|</span>
-              <span className="text-amber-500">{unscheduled.length} unscheduled</span>
+              <span className="text-amber-500">
+                {unscheduled.length} unscheduled
+              </span>
             </div>
           </div>
         </div>
@@ -373,7 +470,10 @@ const SpaceCalendarView: React.FC = () => {
         {/* Weekday labels */}
         <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/50">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="py-2 text-center text-[10px] font-bold tracking-widest text-stone-400 uppercase">
+            <div
+              key={d}
+              className="py-2 text-center text-[10px] font-bold tracking-widest text-stone-400 uppercase"
+            >
               {d}
             </div>
           ))}
@@ -382,12 +482,18 @@ const SpaceCalendarView: React.FC = () => {
         {/* Grid */}
         <div
           className="flex-1 grid grid-cols-7 overflow-y-auto"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#e7e5e4 transparent",
+          }}
         >
           {cells.map((cell, i) => {
             const dateStr = cell.date.format("YYYY-MM-DD");
             const dayTasks = cell.cur ? tasksForDate(dateStr) : [];
-            const isToday = cell.cur && current.isSame(today, "month") && cell.day === today.date();
+            const isToday =
+              cell.cur &&
+              current.isSame(today, "month") &&
+              cell.day === today.date();
             const MAX_VISIBLE = 3;
 
             // Create key: date + active list (or first list if none selected)
@@ -408,8 +514,12 @@ const SpaceCalendarView: React.FC = () => {
                 ${isCellOverdue ? "border-red-100" : ""}
                 ${i % 7 === 6 ? "border-r-0" : ""}
                 `}
-                onDragOver={(e) => { if (cell.cur) e.preventDefault(); }}
-                onDrop={() => { if (cell.cur) handleDropOnCell(dateStr); }}
+                onDragOver={(e) => {
+                  if (cell.cur) e.preventDefault();
+                }}
+                onDrop={() => {
+                  if (cell.cur) handleDropOnCell(dateStr);
+                }}
                 onClick={() => {
                   if (!cell.cur || isCreating) return;
                   setOpenCreateKey(createKey);
@@ -421,9 +531,13 @@ const SpaceCalendarView: React.FC = () => {
                   <span
                     className={`
                       inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold
-                      ${!cell.cur ? "text-stone-300"
-                        : isToday ? "bg-indigo-600 text-white"
-                        : "text-stone-600 group-hover/cell:text-indigo-600"}
+                      ${
+                        !cell.cur
+                          ? "text-stone-300"
+                          : isToday
+                            ? "bg-indigo-600 text-white"
+                            : "text-stone-600 group-hover/cell:text-indigo-600"
+                      }
                     `}
                   >
                     {cell.day}
@@ -437,8 +551,18 @@ const SpaceCalendarView: React.FC = () => {
                       }}
                       className="opacity-0 group-hover/cell:opacity-100 p-0.5 rounded text-stone-300 hover:text-indigo-500 transition-all"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 4v16m8-8H4"
+                        />
                       </svg>
                     </button>
                   )}
@@ -463,7 +587,10 @@ const SpaceCalendarView: React.FC = () => {
                     members={members}
                     statuses={statuses}
                     onClose={() => setOpenCreateKey(null)}
-                    onCreated={() => { setOpenCreateKey(null); fetchData(); }}
+                    onCreated={() => {
+                      setOpenCreateKey(null);
+                      fetchData();
+                    }}
                   />
                 )}
               </div>
@@ -476,7 +603,10 @@ const SpaceCalendarView: React.FC = () => {
       {sidebarOpen && (
         <aside
           className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#e7e5e4 transparent",
+          }}
         >
           {/* Lists by category — filter */}
           <div className="p-4 border-b border-stone-100">
@@ -488,7 +618,9 @@ const SpaceCalendarView: React.FC = () => {
             <button
               onClick={() => setActiveListId(null)}
               className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg mb-1 transition-colors text-left ${
-                !activeListId ? "bg-indigo-50 text-indigo-600" : "hover:bg-stone-100 text-stone-500"
+                !activeListId
+                  ? "bg-indigo-50 text-indigo-600"
+                  : "hover:bg-stone-100 text-stone-500"
               }`}
             >
               <span className="text-[11px] font-semibold">All lists</span>
@@ -507,7 +639,11 @@ const SpaceCalendarView: React.FC = () => {
                   >
                     <span
                       className="material-symbols-outlined text-[13px] text-stone-400 transition-transform duration-150"
-                      style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
+                      style={{
+                        transform: isCollapsed
+                          ? "rotate(-90deg)"
+                          : "rotate(0deg)",
+                      }}
                     >
                       expand_more
                     </span>
@@ -519,17 +655,25 @@ const SpaceCalendarView: React.FC = () => {
                   {!isCollapsed && (
                     <div className="space-y-0.5 pl-1">
                       {group.lists.map((list) => {
-                        const count = tasks.filter((t) => t.listId === list.id).length;
+                        const count = tasks.filter(
+                          (t) => t.listId === list.id,
+                        ).length;
                         const isActive = activeListId === list.id;
                         return (
                           <button
                             key={list.id}
-                            onClick={() => setActiveListId(isActive ? null : list.id)}
+                            onClick={() =>
+                              setActiveListId(isActive ? null : list.id)
+                            }
                             className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors text-left ${
-                              isActive ? "bg-indigo-50 text-indigo-600" : "hover:bg-stone-100 text-stone-600"
+                              isActive
+                                ? "bg-indigo-50 text-indigo-600"
+                                : "hover:bg-stone-100 text-stone-600"
                             }`}
                           >
-                            <span className="text-[11px] font-medium truncate">{list.name}</span>
+                            <span className="text-[11px] font-medium truncate">
+                              {list.name}
+                            </span>
                             <span className="text-[10px] font-bold bg-stone-100 text-stone-400 rounded-full px-1.5 py-0.5 flex-none ml-1">
                               {count}
                             </span>
@@ -550,12 +694,19 @@ const SpaceCalendarView: React.FC = () => {
             </h3>
             <div className="space-y-1.5">
               {statuses.map((s) => {
-                const count = visibleTasks.filter((t) => t.statusId === s.id).length;
+                const count = visibleTasks.filter(
+                  (t) => t.statusId === s.id,
+                ).length;
                 return (
                   <div key={s.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: s.color }} />
-                      <span className="text-xs font-medium text-stone-600">{s.name}</span>
+                      <span
+                        className="w-2 h-2 rounded-full flex-none"
+                        style={{ backgroundColor: s.color }}
+                      />
+                      <span className="text-xs font-medium text-stone-600">
+                        {s.name}
+                      </span>
                     </div>
                     <span className="text-[10px] font-bold text-stone-400 bg-stone-100 rounded-full px-1.5 py-0.5">
                       {count}
@@ -610,18 +761,34 @@ const SpaceCalendarView: React.FC = () => {
                         {t.name}
                       </span>
                       <button
-                        onClick={(e) => { e.stopPropagation(); setEditingTaskId(t.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTaskId(t.id);
+                        }}
                         className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+                          />
                         </svg>
                       </button>
                     </div>
 
                     {/* Inline edit in sidebar */}
                     {editingTaskId === t.id && (
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="mt-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <InlineDayEdit
                           task={t}
                           statuses={statuses}
@@ -635,9 +802,13 @@ const SpaceCalendarView: React.FC = () => {
                     {/* Breadcrumb */}
                     {list && (
                       <div className="flex items-center gap-1 mt-1.5 text-[9px] text-stone-400 font-medium">
-                        <span className="truncate max-w-[50px]">{list.categoryName}</span>
+                        <span className="truncate max-w-[50px]">
+                          {list.categoryName}
+                        </span>
                         <span className="text-stone-300">/</span>
-                        <span className="truncate max-w-[50px]">{list.name}</span>
+                        <span className="truncate max-w-[50px]">
+                          {list.name}
+                        </span>
                       </div>
                     )}
 
@@ -645,14 +816,22 @@ const SpaceCalendarView: React.FC = () => {
                       {status && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                          style={{ backgroundColor: `${status.color}18`, color: status.color }}
+                          style={{
+                            backgroundColor: `${status.color}18`,
+                            color: status.color,
+                          }}
                         >
-                          <span className="w-1 h-1 rounded-full" style={{ backgroundColor: status.color }} />
+                          <span
+                            className="w-1 h-1 rounded-full"
+                            style={{ backgroundColor: status.color }}
+                          />
                           {status.name}
                         </span>
                       )}
                       {t.priority && (
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded px-1.5 py-0.5 ${priorityBadge[t.priority] ?? "bg-stone-50 text-stone-500"}`}>
+                        <span
+                          className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded px-1.5 py-0.5 ${priorityBadge[t.priority] ?? "bg-stone-50 text-stone-500"}`}
+                        >
                           <span className="w-1 h-1 rounded-full bg-current opacity-70" />
                           {t.priority}
                         </span>
@@ -670,8 +849,18 @@ const SpaceCalendarView: React.FC = () => {
 
               {unscheduled.length === 0 && (
                 <div className="flex flex-col items-center py-6 text-stone-300">
-                  <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <svg
+                    className="w-6 h-6 mb-1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
                   </svg>
                   <p className="text-xs font-medium">All scheduled!</p>
                 </div>
@@ -713,40 +902,69 @@ const SpaceCalendarView: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setBulkStatusOpen(true); setBulkAssignOpen(false); }}
+                onClick={() => {
+                  setBulkStatusOpen(true);
+                  setBulkAssignOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">assignment_turned_in</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Status</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  assignment_turned_in
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Status
+                </span>
               </button>
               <button
-                onClick={() => { setBulkAssignOpen(true); setBulkStatusOpen(false); }}
+                onClick={() => {
+                  setBulkAssignOpen(true);
+                  setBulkStatusOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">person_add</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Assign</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  person_add
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Assign
+                </span>
               </button>
               <button
-                onClick={() => { const id = [...checkedIds][0]; if (id) setEditingTaskId(id); }}
+                onClick={() => {
+                  const id = [...checkedIds][0];
+                  if (id) setEditingTaskId(id);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">edit</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Edit</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  edit
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Edit
+                </span>
               </button>
               <button
                 onClick={open}
                 disabled={deleting}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">delete</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Delete</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  delete
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Delete
+                </span>
               </button>
               <button
                 onClick={() => setCheckedIds(new Set())}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-stone-600 hover:bg-stone-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">close</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Clear</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  close
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Clear
+                </span>
               </button>
             </div>
           </div>
@@ -759,7 +977,10 @@ const SpaceCalendarView: React.FC = () => {
         loading={deleting}
         title="Delete Task?"
         description={`Delete ${checkedIds.size > 1 ? `${checkedIds.size} tasks` : "this task"}? This cannot be undone.`}
-        onClose={() => { close(); setDeleteId(null); }}
+        onClose={() => {
+          close();
+          setDeleteId(null);
+        }}
         onConfirm={handleBulkDelete}
       />
 
