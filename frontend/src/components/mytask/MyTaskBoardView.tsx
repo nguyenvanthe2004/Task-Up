@@ -29,7 +29,10 @@ const MyTaskBoardView: React.FC = () => {
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
-  const [dragging, setDragging] = useState<{ taskId: number; fromStatusId: number } | null>(null);
+  const [dragging, setDragging] = useState<{
+    taskId: number;
+    fromStatusId: number;
+  } | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -54,7 +57,9 @@ const MyTaskBoardView: React.FC = () => {
         }
       }
 
-      setStatusGroups(sorted.map((s) => ({ status: s, tasks: taskMap.get(s.id) ?? [] })));
+      setStatusGroups(
+        sorted.map((s) => ({ status: s, tasks: taskMap.get(s.id) ?? [] })),
+      );
     } catch {
       toastError("Failed to load tasks.");
     } finally {
@@ -62,12 +67,35 @@ const MyTaskBoardView: React.FC = () => {
     }
   }, [user?.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleUpdateStatus = async (taskId: number, statusId: number) => {
     try {
       await callUpdateTask(taskId, { statusId } as UpdateTask);
-      await fetchData();
+      setStatusGroups((prev) => {
+        let updatedTask: Task | null = null;
+        return prev.map((g) => {
+          const remainingTasks = g.tasks.filter((t) => {
+            if (t.id === taskId) {
+              updatedTask = { ...t, statusId };
+              return false;
+            }
+            return true;
+          });
+          if (g.status.id === statusId && updatedTask) {
+            return {
+              ...g,
+              tasks: [...remainingTasks, updatedTask],
+            };
+          }
+          return {
+            ...g,
+            tasks: remainingTasks,
+          };
+        });
+      });
     } catch {
       toastError("Failed to update status.");
     }
@@ -77,12 +105,29 @@ const MyTaskBoardView: React.FC = () => {
     try {
       setBulkActionLoading(true);
       await Promise.all(
-        [...checkedIds].map((id) => callUpdateTask(id, { statusId } as any))
+        [...checkedIds].map((id) => callUpdateTask(id, { statusId } as any)),
       );
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setStatusGroups((prev) => {
+        const movedTasks: Task[] = [];
+        const withoutMoved = prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => {
+            if (checkedIds.has(t.id)) {
+              movedTasks.push({ ...t, statusId });
+              return false;
+            }
+            return true;
+          }),
+        }));
+        return withoutMoved.map((g) =>
+          g.status.id === statusId
+            ? { ...g, tasks: [...g.tasks, ...movedTasks] }
+            : g,
+        );
+      });
     } catch {
       toastError("Failed to update status.");
     } finally {
@@ -117,7 +162,9 @@ const MyTaskBoardView: React.FC = () => {
       });
       if (!moved) return prev;
       return without.map((sg) =>
-        sg.status.id === toStatusId ? { ...sg, tasks: [moved!, ...sg.tasks] } : sg
+        sg.status.id === toStatusId
+          ? { ...sg, tasks: [moved!, ...sg.tasks] }
+          : sg,
       );
     });
 
@@ -130,7 +177,10 @@ const MyTaskBoardView: React.FC = () => {
     return (
       <div className="w-full mt-6 flex gap-3 overflow-x-auto pb-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex-none w-60 rounded-2xl border border-stone-200/60 bg-white/60 animate-pulse">
+          <div
+            key={i}
+            className="flex-none w-60 rounded-2xl border border-stone-200/60 bg-white/60 animate-pulse"
+          >
             <div className="px-3 pt-3 pb-2.5 flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-stone-200" />
               <div className="h-3 w-16 rounded bg-stone-200" />
@@ -155,10 +205,16 @@ const MyTaskBoardView: React.FC = () => {
       {/* Board */}
       <div
         className="flex items-start gap-3 pb-4"
-        style={{ overflowX: "auto", scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
+        style={{
+          overflowX: "auto",
+          scrollbarWidth: "thin",
+          scrollbarColor: "#e7e5e4 transparent",
+        }}
       >
         {statusGroups.map((sg) => {
-          const isDone = sg.status.name.toLowerCase() === "done" || sg.status.name.toLowerCase() === "closed";
+          const isDone =
+            sg.status.name.toLowerCase() === "done" ||
+            sg.status.name.toLowerCase() === "closed";
           const isOver = dragOver === sg.status.id;
 
           return (
@@ -168,12 +224,16 @@ const MyTaskBoardView: React.FC = () => {
                 flex-none flex flex-col
                 w-[240px] sm:w-[260px] lg:w-64
                 rounded-2xl border transition-all duration-150
-                ${isOver
-                  ? "border-indigo-300 bg-indigo-50/50 shadow-lg"
-                  : "border-stone-200/60 bg-white/60"
+                ${
+                  isOver
+                    ? "border-indigo-300 bg-indigo-50/50 shadow-lg"
+                    : "border-stone-200/60 bg-white/60"
                 }
               `}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(sg.status.id); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(sg.status.id);
+              }}
               onDragLeave={() => setDragOver(null)}
               onDrop={() => handleDrop(sg.status.id)}
             >
@@ -202,24 +262,45 @@ const MyTaskBoardView: React.FC = () => {
               >
                 {sg.tasks.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-stone-300">
-                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <svg
+                      className="w-5 h-5 mb-1"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
                     </svg>
                     <p className="text-[11px] font-medium">No tasks</p>
                   </div>
                 )}
 
                 {sg.tasks.map((task) => {
-                  const overdue = task.dueDate && new Date(task.dueDate) < new Date();
+                  const overdue =
+                    task.dueDate && new Date(task.dueDate) < new Date();
                   const isChecked = checkedIds.has(task.id);
 
                   return (
                     <div
                       key={task.id}
                       draggable
-                      onDragStart={() => setDragging({ taskId: task.id, fromStatusId: sg.status.id })}
-                      onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                      className={dragging?.taskId === task.id ? "opacity-40" : ""}
+                      onDragStart={() =>
+                        setDragging({
+                          taskId: task.id,
+                          fromStatusId: sg.status.id,
+                        })
+                      }
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setDragOver(null);
+                      }}
+                      className={
+                        dragging?.taskId === task.id ? "opacity-40" : ""
+                      }
                     >
                       <div
                         className={`
@@ -235,7 +316,10 @@ const MyTaskBoardView: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={(e) => { e.stopPropagation(); toggleCheck(task.id); }}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleCheck(task.id);
+                              }}
                               onClick={(e) => e.stopPropagation()}
                               className="accent-indigo-500 w-3.5 h-3.5 rounded flex-none opacity-0 group-hover:opacity-100 transition-opacity"
                               style={isChecked ? { opacity: 1 } : {}}
@@ -243,12 +327,16 @@ const MyTaskBoardView: React.FC = () => {
                             {task.priority && (
                               <span
                                 className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                                  priorityBadge[task.priority] ?? "bg-stone-50 text-stone-500"
+                                  priorityBadge[task.priority] ??
+                                  "bg-stone-50 text-stone-500"
                                 }`}
                               >
                                 <span
                                   className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: priorityColor[task.priority] ?? "#78716c" }}
+                                  style={{
+                                    backgroundColor:
+                                      priorityColor[task.priority] ?? "#78716c",
+                                  }}
                                 />
                                 {task.priority}
                               </span>
@@ -265,7 +353,9 @@ const MyTaskBoardView: React.FC = () => {
                         <p
                           onClick={() => setSelected(task)}
                           className={`text-[13px] font-semibold leading-snug mb-1.5 cursor-pointer hover:text-indigo-600 transition-colors ${
-                            isDone ? "line-through text-stone-400" : "text-stone-700"
+                            isDone
+                              ? "line-through text-stone-400"
+                              : "text-stone-700"
                           }`}
                         >
                           {task.name}
@@ -275,18 +365,24 @@ const MyTaskBoardView: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-1 mb-2.5 text-[10px] text-stone-400 font-medium">
                           {task.list?.category?.space?.name && (
                             <>
-                              <span className="truncate max-w-[60px]">{task.list.category.space.name}</span>
+                              <span className="truncate max-w-[60px]">
+                                {task.list.category.space.name}
+                              </span>
                               <span className="text-stone-300">/</span>
                             </>
                           )}
                           {task.list?.category?.name && (
                             <>
-                              <span className="truncate max-w-[60px]">{task.list.category.name}</span>
+                              <span className="truncate max-w-[60px]">
+                                {task.list.category.name}
+                              </span>
                               <span className="text-stone-300">/</span>
                             </>
                           )}
                           {task.list?.name && (
-                            <span className="truncate max-w-[60px]">{task.list.name}</span>
+                            <span className="truncate max-w-[60px]">
+                              {task.list.name}
+                            </span>
                           )}
                         </div>
 
@@ -302,7 +398,9 @@ const MyTaskBoardView: React.FC = () => {
                         {/* Footer: status + avatar */}
                         <div className="flex items-center justify-between gap-2 mt-2.5">
                           {(() => {
-                            const s = statuses.find((st) => st.id === task.statusId);
+                            const s = statuses.find(
+                              (st) => st.id === task.statusId,
+                            );
                             return s ? (
                               <span
                                 className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
@@ -312,10 +410,15 @@ const MyTaskBoardView: React.FC = () => {
                                   border: `1px solid ${s.color}30`,
                                 }}
                               >
-                                <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: s.color }}
+                                />
                                 {s.name}
                               </span>
-                            ) : <span />;
+                            ) : (
+                              <span />
+                            );
                           })()}
 
                           {task.assignees && task.assignees.length > 0 && (
@@ -326,14 +429,31 @@ const MyTaskBoardView: React.FC = () => {
                         {/* Date range */}
                         {(task.startDate || task.dueDate) && (
                           <div className="flex items-center gap-1.5 mt-2 text-[10px] font-medium tabular-nums text-stone-400">
-                            <svg className="w-3 h-3 flex-shrink-0 text-stone-300" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <svg
+                              className="w-3 h-3 flex-shrink-0 text-stone-300"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              viewBox="0 0 24 24"
+                            >
                               <rect x="3" y="4" width="18" height="18" rx="2" />
-                              <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+                              <path
+                                strokeLinecap="round"
+                                d="M16 2v4M8 2v4M3 10h18"
+                              />
                             </svg>
-                            {task.startDate && <span>{fmtDate(task.startDate)}</span>}
-                            {task.startDate && task.dueDate && <span className="text-stone-300">→</span>}
+                            {task.startDate && (
+                              <span>{fmtDate(task.startDate)}</span>
+                            )}
+                            {task.startDate && task.dueDate && (
+                              <span className="text-stone-300">→</span>
+                            )}
                             {task.dueDate && (
-                              <span className={overdue ? "text-red-400 font-semibold" : ""}>
+                              <span
+                                className={
+                                  overdue ? "text-red-400 font-semibold" : ""
+                                }
+                              >
                                 {fmtDate(task.dueDate)}
                               </span>
                             )}
@@ -372,15 +492,23 @@ const MyTaskBoardView: React.FC = () => {
                 onClick={() => setBulkStatusOpen(true)}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">assignment_turned_in</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Status</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  assignment_turned_in
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Status
+                </span>
               </button>
               <button
                 onClick={() => setCheckedIds(new Set())}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-400 hover:bg-red-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">close</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Clear</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  close
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Clear
+                </span>
               </button>
             </div>
           </div>

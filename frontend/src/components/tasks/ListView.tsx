@@ -95,12 +95,17 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.map((t) => (t.id === id ? { ...t, ...data } : t)),
+        })),
+      );
     } catch {
       toastError("Failed to update task.");
     }
@@ -112,9 +117,14 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
       setDeleting(true);
       await Promise.all([...checkedIds].map(callDeleteTask));
       toastSuccess(`${checkedIds.size} tasks deleted successfully!`);
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => !checkedIds.has(t.id)),
+        })),
+      );
       close();
       setCheckedIds(new Set());
-      await fetchData();
     } catch {
       toastError("Failed to delete tasks.");
     } finally {
@@ -131,9 +141,27 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
         ),
       );
       toastSuccess("Status updated.");
+      setGroups((prev) => {
+        const movedTasks: Task[] = [];
+        const withoutMoved = prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => {
+            if (checkedIds.has(t.id)) {
+              movedTasks.push({ ...t, statusId });
+              return false;
+            }
+            return true;
+          }),
+        }));
+        return withoutMoved.map((g) =>
+          g.status.id === statusId
+            ? { ...g, tasks: [...g.tasks, ...movedTasks] }
+            : g,
+        );
+      });
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      fetchData();
     } catch {
       toastError("Failed to update status.");
     } finally {
@@ -150,9 +178,17 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
         ),
       );
       toastSuccess("Assigned successfully.");
+      const newAssignees = members.filter((m) => memberIds.includes(m.id));
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.map((t) =>
+            checkedIds.has(t.id) ? { ...t, assignees: newAssignees } : t,
+          ),
+        })),
+      );
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
     } catch (error: any) {
       toastError(error.message);
     } finally {
@@ -500,34 +536,38 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                   Status
                 </span>
               </button>
-              <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  const firstId = [...checkedIds][0];
-                  if (firstId) setEditingTaskId(firstId);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
-              </button>
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    setBulkAssignOpen(true);
+                    setBulkStatusOpen(false);
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    person_add
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Assign
+                  </span>
+                </button>
+              )}
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    const firstId = [...checkedIds][0];
+                    if (firstId) setEditingTaskId(firstId);
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    edit
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Edit
+                  </span>
+                </button>
+              )}
               <button
                 onClick={open}
                 disabled={deleting}

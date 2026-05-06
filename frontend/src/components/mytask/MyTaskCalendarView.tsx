@@ -66,7 +66,9 @@ const MyTaskCalendarView: React.FC = () => {
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
+      );
     } catch {
       toastError("Failed to update.");
     }
@@ -74,6 +76,7 @@ const MyTaskCalendarView: React.FC = () => {
 
   const handleBulkStatus = async (statusId: number) => {
     try {
+      const ids = [...checkedIds];
       setBulkActionLoading(true);
       await Promise.all(
         [...checkedIds].map((id) =>
@@ -83,7 +86,9 @@ const MyTaskCalendarView: React.FC = () => {
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setTasks((prev) =>
+        prev.map((t) => (ids.includes(t.id) ? { ...t, statusId } : t)),
+      );
     } catch {
       toastError("Failed to update status.");
     } finally {

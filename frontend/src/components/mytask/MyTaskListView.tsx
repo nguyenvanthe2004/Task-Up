@@ -79,7 +79,28 @@ const MyTaskListView: React.FC = () => {
   const handleUpdateStatus = async (taskId: number, statusId: number) => {
     try {
       await callUpdateTask(taskId, { statusId } as UpdateTask);
-      await fetchData();
+      setStatusGroups((prev) => {
+        let updatedTask: Task | null = null;
+        return prev.map((g) => {
+          const remainingTasks = g.tasks.filter((t) => {
+            if (t.id === taskId) {
+              updatedTask = { ...t, statusId };
+              return false;
+            }
+            return true;
+          });
+          if (g.status.id === statusId && updatedTask) {
+            return {
+              ...g,
+              tasks: [...remainingTasks, updatedTask],
+            };
+          }
+          return {
+            ...g,
+            tasks: remainingTasks,
+          };
+        });
+      });
     } catch {
       toastError("Failed to update status.");
     }
@@ -94,7 +115,24 @@ const MyTaskListView: React.FC = () => {
       toastSuccess("Status updated.");
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
+      setStatusGroups((prev) => {
+        const movedTasks: Task[] = [];
+        const withoutMoved = prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => {
+            if (checkedIds.has(t.id)) {
+              movedTasks.push({ ...t, statusId });
+              return false;
+            }
+            return true;
+          }),
+        }));
+        return withoutMoved.map((g) =>
+          g.status.id === statusId
+            ? { ...g, tasks: [...g.tasks, ...movedTasks] }
+            : g,
+        );
+      });
     } catch {
       toastError("Failed to update status.");
     } finally {
