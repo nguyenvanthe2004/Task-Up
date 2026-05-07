@@ -486,105 +486,117 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                   </p>
                 )}
 
-                {/* FIX: key dùng string rõ ràng, tránh trường hợp id undefined */}
-                {comments.map((c) => (
-                  <div
-                    key={`comment-${c.id}`}
-                    className="group flex gap-3 rounded-xl p-2.5 transition-colors hover:bg-stone-100"
-                  >
-                    <img
-                      src={normalizeImg(c.user?.avatar)}
-                      alt={c.user?.fullName}
-                      className="h-8 w-8 shrink-0 rounded-full border border-stone-200 object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                {comments.map((c) => {
+                  const isOwn = currentUser?.id === c.user?.id;
+                  return (
+                    <div
+                      key={`comment-${c.id}`}
+                      className={`group flex gap-3 p-2.5 ${isOwn ? "flex-row-reverse" : "flex-row"}`}
+                    >
+                      <img
+                        src={normalizeImg(c.user?.avatar)}
+                        alt={c.user?.fullName}
+                        className="h-8 w-8 shrink-0 rounded-full border border-stone-200 object-cover"
+                      />
+                      <div
+                        className={`flex flex-col max-w-[75%] min-w-0 ${isOwn ? "items-end" : "items-start"}`}
+                      >
+                        <div
+                          className={`mb-1 flex items-center gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}
+                        >
                           <span className="text-[13px] font-semibold text-stone-700">
-                            {c.user?.fullName}
+                            {isOwn ? "You" : c.user?.fullName}
                           </span>
                           {c.createdAt && (
                             <span className="text-[11px] text-stone-400">
                               {dayjs(c.createdAt).format("MMM D, YYYY · HH:mm")}
                             </span>
                           )}
-                        </div>
-
-                        <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <EllipsisMenu
-                            actions={[
-                              {
-                                label: "Edit",
-                                icon: <Pencil className="w-4 h-4" />,
-                                onClick: () => startEdit(c),
-                              },
-                              {
-                                label: "Delete",
-                                icon: <Trash2 className="w-4 h-4" />,
-                                onClick: () => handleDeleteComment(c.id),
-                                variant: "danger",
-                              },
-                            ]}
-                            align="right"
-                          />
-                        </div>
-                      </div>
-
-                      {/* ── Inline edit mode ── */}
-                      {editingCommentId === c.id ? (
-                        <form onSubmit={handleSubmitEdit(onSubmitEdit)}>
-                          <textarea
-                            {...registerEdit("content")}
-                            ref={(el) => {
-                              registerEdit("content").ref(el);
-                              (
-                                editTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>
-                              ).current = el;
-                            }}
-                            rows={3}
-                            className="w-full resize-none rounded-xl border border-indigo-300 bg-white px-3.5 py-2.5 text-[13px] text-stone-700 placeholder:text-stone-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                          />
-                          {editErrors.content && (
-                            <p className="mt-1 text-[11px] text-red-500">
-                              {editErrors.content.message}
-                            </p>
+                          {isOwn && (
+                            <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                              <EllipsisMenu
+                                actions={[
+                                  {
+                                    label: "Edit",
+                                    icon: <Pencil className="w-4 h-4" />,
+                                    onClick: () => startEdit(c),
+                                  },
+                                  {
+                                    label: "Delete",
+                                    icon: <Trash2 className="w-4 h-4" />,
+                                    onClick: () => handleDeleteComment(c.id),
+                                    variant: "danger",
+                                  },
+                                ]}
+                                align={isOwn ? "right" : "left"}
+                              />
+                            </div>
                           )}
-                          <div className="mt-2 flex gap-1.5">
-                            <button
-                              type="submit"
-                              disabled={loading}
-                              className="flex items-center gap-1 rounded-lg bg-stone-800 px-3 py-1.5 text-[11px] font-semibold text-white transition-all hover:bg-stone-700 disabled:opacity-50"
-                            >
-                              {loading ? (
-                                <span className="material-symbols-outlined animate-spin text-[13px]">
-                                  progress_activity
-                                </span>
-                              ) : (
-                                <span className="material-symbols-outlined text-[13px]">
-                                  check
-                                </span>
-                              )}
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelEdit}
-                              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition-all hover:bg-stone-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          <p className="mb-2 rounded-tr-xl rounded-b-xl border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-stone-500">
+                        </div>
+
+                        {editingCommentId === c.id ? (
+                          <form
+                            onSubmit={handleSubmitEdit(onSubmitEdit)}
+                            className="w-full"
+                          >
+                            <textarea
+                              {...registerEdit("content")}
+                              ref={(el) => {
+                                registerEdit("content").ref(el);
+                                (
+                                  editTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+                                ).current = el;
+                              }}
+                              rows={3}
+                              className="w-full resize-none rounded-xl border border-indigo-300 bg-white px-3.5 py-2.5 text-[13px] text-stone-700 placeholder:text-stone-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            />
+                            {editErrors.content && (
+                              <p className="mt-1 text-[11px] text-red-500">
+                                {editErrors.content.message}
+                              </p>
+                            )}
+                            <div className="mt-2 flex gap-1.5">
+                              <button
+                                type="submit"
+                                disabled={loading}
+                                className="flex items-center gap-1 rounded-lg bg-stone-800 px-3 py-1.5 text-[11px] font-semibold text-white transition-all hover:bg-stone-700 disabled:opacity-50"
+                              >
+                                {loading ? (
+                                  <span className="material-symbols-outlined animate-spin text-[13px]">
+                                    progress_activity
+                                  </span>
+                                ) : (
+                                  <span className="material-symbols-outlined text-[13px]">
+                                    check
+                                  </span>
+                                )}
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition-all hover:bg-stone-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <p
+                            className={`rounded-b-xl px-3.5 py-2.5 text-[13px] leading-relaxed border border-stone-200
+                              ${
+                              isOwn
+                              ? "rounded-tl-xl bg-stone-800 text-white border-stone-700"
+                              : "rounded-tr-xl bg-white text-stone-500"
+                            }`}
+                          >
                             {c.content}
                           </p>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

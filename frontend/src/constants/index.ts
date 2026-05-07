@@ -21,17 +21,17 @@ export enum PriorityStatus {
 }
 
 export const priorityBadge: Record<string, string> = {
-  High: "bg-red-50 text-red-700",
-  Normal: "bg-amber-50 text-amber-700",
-  Low: "bg-emerald-50 text-emerald-700",
-  Urgent: "bg-purple-50 text-purple-700",
+  high: "bg-red-50 text-red-700",
+  hormal: "bg-amber-50 text-amber-700",
+  low: "bg-emerald-50 text-emerald-700",
+  urgent: "bg-purple-50 text-purple-700",
 };
 
 export const priorityColor: Record<string, string> = {
-  Urgent: "#7c3aed",
-  High: "#b91c1c",
-  Normal: "#b45309",
-  Low: "#047857",
+  urgent: "#7c3aed",
+  high: "#b91c1c",
+  normal: "#b45309",
+  low: "#047857",
 };
 
 export const statusBadge: Record<string, string> = {
@@ -39,12 +39,6 @@ export const statusBadge: Record<string, string> = {
   Review: "bg-violet-50 text-violet-600",
   Waiting: "bg-amber-50 text-amber-600",
   Done: "bg-emerald-50 text-emerald-600",
-};
-
-export const priorityMap: Record<string, { dot: string; text: string; bg: string }> = {
-  High:   { dot: "bg-red-500",     text: "text-red-700",     bg: "bg-red-50"     },
-  Medium: { dot: "bg-amber-500",   text: "text-amber-700",   bg: "bg-amber-50"   },
-  Low:    { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
 };
 
 export const statusMap: Record<string, { icon: string; text: string; bg: string; border: string }> = {

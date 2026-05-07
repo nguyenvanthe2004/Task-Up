@@ -95,7 +95,7 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [listId]);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {

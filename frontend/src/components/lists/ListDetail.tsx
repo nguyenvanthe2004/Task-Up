@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Member, CreateTask, ImportTask, Task, ListViewHandle } from "../../types/task";
+import {
+  Member,
+  CreateTask,
+  ImportTask,
+  Task,
+  ListViewHandle,
+} from "../../types/task";
 import KanbanBoard from "../tasks/KanbanBoard";
 import CalendarView from "../tasks/CalendarView";
 import DetailTask from "../tasks/DetailTask";
@@ -27,13 +33,13 @@ const VIEW_TABS: { key: ListViewType; icon: string; label: string }[] = [
 const CHUNK_SIZE = 10;
 
 const normalizeItem = (item: Record<string, any>): ImportTask => ({
-  name: item.Name ?? item.name,
-  description: item.Description ?? item.description ?? "",
-  statusId: Number(item.StatusId ?? item.statusId),
-  priority: item.Priority ?? item.priority,
-  tag: item.Tag ?? item.tag,
-  startDate: item.StartDate ?? item.startDate,
-  dueDate: item.DueDate ?? item.dueDate,
+  name: item.Name,
+  description: item.Description ?? "",
+  statusId: Number(item.StatusId),
+  priority: item.Priority,
+  tag: item.Tag,
+  startDate: item.StartDate,
+  dueDate: item.DueDate,
   assignees: item.Assignees
     ? String(item.Assignees)
         .split(",")
@@ -65,7 +71,10 @@ const toCreateTask = (item: ImportTask, listId: number): CreateTask => ({
 
 const ListDetail: React.FC = () => {
   const listViewRef = useRef<ListViewHandle>(null);
-  const { categoryId, listId } = useParams<{ categoryId: string, listId: string }>();
+  const { categoryId, listId } = useParams<{
+    categoryId: string;
+    listId: string;
+  }>();
   const { workspaceId, spaceId } = useParams();
   const [searchParams] = useSearchParams();
   const modeView = searchParams.get("mode");
@@ -80,13 +89,14 @@ const ListDetail: React.FC = () => {
   const importRef = useRef<HTMLInputElement>(null);
 
   const onClick = (mode: ListViewType) => {
-    navigate(`/${workspaceId}/spaces/${spaceId}/${categoryId}/${listId}?mode=${mode}`);
+    navigate(
+      `/${workspaceId}/spaces/${spaceId}/${categoryId}/${listId}?mode=${mode}`,
+    );
   };
 
-  const fetchData = useCallback(async () => {
-    if (!listId) return;
+  const fetchData = async (id: number) => {
     try {
-      const res = await callGetListById(Number(listId));
+      const res = await callGetListById(id);
       const listData = res.data;
       setList(listData);
       const cat = listData?.category ?? null;
@@ -98,12 +108,16 @@ const ListDetail: React.FC = () => {
     } catch (error: any) {
       toastError(error.message);
     }
+  };
+
+  useEffect(() => {
+    if (!listId) return;
+    fetchData(Number(listId));
   }, [listId]);
 
   useEffect(() => {
-    fetchData();
-    !modeView ? setView("list") : setView(modeView as ListViewType);
-  }, [fetchData, modeView]);
+    setView(modeView ? (modeView as ListViewType) : "list");
+  }, [modeView]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

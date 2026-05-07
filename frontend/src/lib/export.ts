@@ -8,7 +8,7 @@ const formatTasks = (tasks: Task[]) => {
     Name: t.name,
     Description: t.description || "",
     Priority: t.priority || "",
-    Status: t.status?.[0]?.name || t.statusId,
+    StatusId: t.statusId, 
     Tag: t.tag || "",
     StartDate: t.startDate || "",
     DueDate: t.dueDate || "",

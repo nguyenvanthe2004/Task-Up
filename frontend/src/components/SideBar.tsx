@@ -113,8 +113,6 @@ const bottomItems = [
   { label: "Help", icon: <HelpCircle size={18} />, path: "/help" },
 ];
 
-const slug = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
-
 const SideBar: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -159,6 +157,7 @@ const SideBar: React.FC = () => {
   };
 
   const fetchSpaces = async () => {
+    setLoading(true);
     try {
       const res = await callGetSpaces(Number(workspaceId));
       setSpaces(res.data);
@@ -170,33 +169,61 @@ const SideBar: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSpaces();
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await callGetSpaces(Number(workspaceId));
+        if (!cancelled) setSpaces(res.data);
+      } catch (error: any) {
+        if (!cancelled) toastError(error.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId]);
 
   const handleCreateSpace = async (data: CreateSpaceFormData) => {
-    await callCreateSpace(data, Number(workspaceId));
-    await fetchSpaces();
+    try {
+      await callCreateSpace(data, Number(workspaceId));
+      await fetchSpaces();
+    } catch (error: any) {
+      toastError(error.message);
+    }
   };
 
   const handleCreateCategory = async (data: CreateCategoryFormData) => {
-    await callCreateCategory(data, Number(selectedSpaceId));
-    await fetchSpaces();
+    try {
+      await callCreateCategory(data, Number(selectedSpaceId));
+      await fetchSpaces();
+    } catch (error: any) {
+      toastError(error.message);
+    }
   };
 
   const handleCreateList = async (data: CreateListFormData) => {
-    await callCreateList(data, Number(selectedCategoryId));
-    await fetchSpaces();
+    try {
+      await callCreateList(data, Number(selectedCategoryId));
+      await fetchSpaces();
+    } catch (error: any) {
+      toastError(error.message);
+    }
   };
 
-  const isSpacePath = (spaceName: string) =>
-    pathname.includes(`/spaces/${slug(spaceName)}`);
+  const isSpacePath = (spaceId: number) =>
+    pathname.includes(`/${workspaceId}/spaces/${spaceId}`);
 
-  const isCategoryPath = (spaceName: string, catName: string) =>
-    pathname.includes(`/spaces/${slug(spaceName)}/${slug(catName)}`);
+  const isCategoryPath = (spaceId: number, catId: number) =>
+    pathname.includes(`/${workspaceId}/spaces/${spaceId}/${catId}`);
 
-  const isProjectPath = (spaceName: string, catName: string, project: string) =>
-    pathname ===
-    `/${workspaceId}/spaces/${slug(spaceName)}/${slug(catName)}/${slug(project)}`;
+  const isListPath = (spaceId: number, catId: number, listId: number) =>
+    pathname === `/${workspaceId}/spaces/${spaceId}/${catId}/${listId}`;
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -208,7 +235,6 @@ const SideBar: React.FC = () => {
 
   const navigateToList = (spaceId: number, catId: number, listId: number) => {
     navigate(`/${workspaceId}/spaces/${spaceId}/${catId}/${listId}`);
-    setIsOpen(false);
   };
 
   const toggleSpace = (index: number) =>
@@ -241,15 +267,33 @@ const SideBar: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    spaces.forEach((space, spaceIdx) => {
+      if (isSpacePath(space.id)) {
+        setOpenSpacesList((prev) =>
+          prev.includes(spaceIdx) ? prev : [...prev, spaceIdx],
+        );
+
+        space.categories.forEach((cat, catIdx) => {
+          if (isCategoryPath(space.id, cat.id)) {
+            const key = `${spaceIdx}-${catIdx}`;
+            setOpenCategories((prev) =>
+              prev.includes(key) ? prev : [...prev, key],
+            );
+          }
+        });
+      }
+    });
+  }, [pathname]);
+
   const renderSpacesTree = () => (
     <div className="ml-1 mt-0.5 space-y-0.5">
       {spaces.map((space, spaceIdx) => {
         const isSpaceOpen = openSpacesList.includes(spaceIdx);
-        const spaceActive = isSpacePath(space.name);
+        const spaceActive = isSpacePath(space.id);
 
         return (
           <div key={space.id}>
-            {" "}
             <div className="flex items-center group">
               <button
                 className="flex items-center justify-center w-6 h-8 flex-shrink-0 rounded hover:bg-slate-200/60 transition-colors"
@@ -261,7 +305,7 @@ const SideBar: React.FC = () => {
                 />
               </button>
               <button
-                className={`flex-1 flex items-center gap-2 px-1 rounded-lg text-sm font-medium min-w-0 transition-all duration-150 ${
+                className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium min-w-0 transition-all duration-150 ${
                   spaceActive
                     ? "bg-indigo-50 text-indigo-700"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
@@ -289,11 +333,10 @@ const SideBar: React.FC = () => {
                 {space.categories.map((cat, catIdx) => {
                   const catKey = `${spaceIdx}-${catIdx}`;
                   const isCatOpen = openCategories.includes(catKey);
-                  const catActive = isCategoryPath(space.name, cat.name);
+                  const catActive = isCategoryPath(space.id, cat.id);
 
                   return (
                     <div key={cat.id}>
-                      {" "}
                       <div className="flex items-center group">
                         <button
                           className="flex items-center justify-center w-5 h-7 flex-shrink-0 rounded hover:bg-slate-200/60 transition-colors"
@@ -310,7 +353,11 @@ const SideBar: React.FC = () => {
                               ? "bg-indigo-50/70 text-indigo-600"
                               : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                           }`}
-                          onClick={() => navigateToSpace(space.id)}
+                          onClick={() =>
+                            navigate(
+                              `/${workspaceId}/spaces/${space.id}/${cat.id}`,
+                            )
+                          }
                         >
                           <span className="truncate">{cat.name}</span>
                         </button>
@@ -331,10 +378,10 @@ const SideBar: React.FC = () => {
                       {isCatOpen && (
                         <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-100 pl-2">
                           {cat.lists.map((list) => {
-                            const listActive = isProjectPath(
-                              space.name,
-                              cat.name,
-                              list.name,
+                            const listActive = isListPath(
+                              space.id,
+                              cat.id,
+                              list.id,
                             );
                             return (
                               <button
@@ -570,7 +617,7 @@ const SideBar: React.FC = () => {
 
               <div className="h-px bg-slate-100 my-1" />
 
-              {/* Switch Workspace — lấy từ user.workspaces */}
+              {/* Switch Workspace */}
               {userWorkspaces.filter((ws) => ws.id !== workspace?.id).length >
                 0 && (
                 <div className="pt-1">
