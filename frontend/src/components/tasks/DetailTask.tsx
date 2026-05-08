@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
 import { DetailTaskProps } from "../../types/task";
 import { priorityBadge, priorityColor } from "../../constants";
 import { AvatarStack } from "../ui/AvatarStack";
@@ -24,6 +26,8 @@ import EllipsisMenu from "../ui/EllipsisMenu";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import { Pencil, Trash2 } from "lucide-react";
+import { Activity } from "../../types/activity";
+import { callGetActivities } from "../../services/activity";
 
 const ATTACHMENT_IMAGES = [
   {
@@ -45,10 +49,11 @@ const DetailTask: React.FC<DetailTaskProps> = ({
   onUpdate,
   onDelete,
 }) => {
-  const [activeTab, setActiveTab] = useState<"all" | "comments" | "history">(
+  const [activeTab, setActiveTab] = useState<"all" | "comments" | "activity">(
     "all",
   );
   const [comments, setComments] = useState<Comment[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [isStarred, setIsStarred] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -94,9 +99,26 @@ const DetailTask: React.FC<DetailTaskProps> = ({
     }
   };
 
+  const fetchActivities = async () => {
+    try {
+      const res = await callGetActivities(task.id);
+      setActivities(res.data);
+    } catch (error: any) {
+      console.error(error.message);
+    }
+  };
+
   useEffect(() => {
-    fetchComments();
-  }, [task]);
+    const fetchData = async () => {
+      try {
+        await Promise.all([fetchComments(), fetchActivities()]);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchData();
+  }, [task.id]);
 
   useEffect(() => {
     if (editingCommentId !== null && editTextareaRef.current) {
@@ -446,8 +468,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                 Activity
               </h3>
               <div className="flex gap-1">
-                {/* FIX: key trên mỗi button trong map */}
-                {(["all", "comments", "history"] as const).map((tab) => (
+                {(["all", "comments", "activity"] as const).map((tab) => (
                   <button
                     key={`tab-${tab}`}
                     onClick={() => setActiveTab(tab)}
@@ -463,18 +484,40 @@ const DetailTask: React.FC<DetailTaskProps> = ({
               </div>
             </div>
 
-            {(activeTab === "all" || activeTab === "history") && (
-              <div className="mb-4 flex justify-center">
-                <div className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400">
-                  <span className="material-symbols-outlined text-[12px]">
-                    info
-                  </span>
-                  Alex Thompson changed status to{" "}
-                  <strong className="font-semibold text-stone-600">
-                    In Progress
-                  </strong>
-                  &nbsp;· 3 days ago
-                </div>
+            {(activeTab === "all" || activeTab === "activity") && (
+              <div className="mb-4 flex flex-col gap-2">
+                {activities.length === 0 ? (
+                  <p className="py-4 text-center text-[12px] text-stone-400">
+                    No activity yet.
+                  </p>
+                ) : (
+                  activities.map((activity) => (
+                    <div
+                      key={`activity-${activity.id}`}
+                      className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400 self-center"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">
+                        info
+                      </span>
+                      <span>
+                        {(() => {
+                          const match = activity.action.match(/^(.+ to )(.+)$/);
+                          if (!match) return activity.action;
+                          return (
+                            <>
+                              {match[1]}
+                              <strong className="font-semibold text-stone-600">
+                                {match[2]}
+                              </strong>
+                            </>
+                          );
+                        })()}
+                      </span>
+                      <span>·</span>
+                      <span>{dayjs(activity.createdAt).fromNow()}</span>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 
@@ -585,10 +628,10 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                           <p
                             className={`rounded-b-xl px-3.5 py-2.5 text-[13px] leading-relaxed border border-stone-200
                               ${
-                              isOwn
-                              ? "rounded-tl-xl bg-stone-800 text-white border-stone-700"
-                              : "rounded-tr-xl bg-white text-stone-500"
-                            }`}
+                                isOwn
+                                  ? "rounded-tl-xl bg-stone-800 text-white border-stone-700"
+                                  : "rounded-tr-xl bg-white text-stone-500"
+                              }`}
                           >
                             {c.content}
                           </p>

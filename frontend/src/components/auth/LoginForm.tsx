@@ -18,7 +18,6 @@ const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [showPassword, setShowPassword] = useState(false);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   const {
     register,
@@ -29,24 +28,10 @@ const LoginForm: React.FC = () => {
     mode: "onChange",
   });
 
-  const handleInvite = async (navigate: ReturnType<typeof useNavigate>) => {
-    const inviteToken = localStorage.getItem("inviteToken");
-    if (!inviteToken) return false;
-
-    try {
-      const { data } = await callAcceptInvite(inviteToken);
-      localStorage.removeItem("inviteToken");
-      navigate(`/${data.workspaceId}`);
-    } catch (error: any) {
-      toastError(error.message);
-      localStorage.removeItem("inviteToken");
-    }
-    return true;
-  };
-
   const onSubmit = async (dto: LoginFormData) => {
     try {
       const { data } = await callLogin(dto);
+      
       dispatch(setCurrentUser(data.user));
       toastSuccess("Login successfully");
 
@@ -57,8 +42,6 @@ const LoginForm: React.FC = () => {
         navigate("/");
       }
 
-      const redirected = await handleInvite(navigate);
-      if (redirected) return;
     } catch (error: any) {
       toastError(error.message);
     }
@@ -72,6 +55,7 @@ const LoginForm: React.FC = () => {
         throw new Error("No credential from Google");
 
       const res = await callLoginGoogle(credentialResponse.credential);
+      
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login successfully");
 
@@ -81,9 +65,6 @@ const LoginForm: React.FC = () => {
       } else {
         navigate("/");
       }
-
-      const redirected = await handleInvite(navigate);
-      if (redirected) return;
     } catch (error: any) {
       toastError(error.message);
     }

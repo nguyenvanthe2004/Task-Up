@@ -147,13 +147,6 @@ const TestimonialCard: React.FC<{
 /* ─── Main Component ─── */
 const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const inviteToken = params.get("inviteToken");
-
-  useEffect(() => {
-    if (!inviteToken) return;
-    localStorage.setItem("inviteToken", inviteToken);
-  }, [inviteToken]);
 
   return (
     <div className="bg-white font-sans antialiased overflow-x-hidden">

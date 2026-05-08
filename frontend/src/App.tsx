@@ -4,7 +4,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import { useEffect, useState } from "react";
 import { callGetCurrentUser } from "./services/auth";
-import { setCurrentUser } from "./redux/slices/currentUser";
+import { logout, setCurrentUser } from "./redux/slices/currentUser";
 import { useDispatch, useSelector } from "react-redux";
 import GithubCallback from "./components/auth/GitHubCallBack";
 import HomePage from "./pages/home/HomePage";
@@ -22,6 +22,7 @@ import { RootState } from "./redux/store";
 
 function App() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const currentUser = useSelector((state: RootState) => state.auth.currentUser);
   const isAuthenticated = !!currentUser;
@@ -30,6 +31,17 @@ function App() {
       const res = await callGetCurrentUser();
       dispatch(setCurrentUser(res.data));
     } catch {
+      dispatch(logout());
+
+      const publicPaths = ["/login", "/register", "/landing"];
+      const isPublicPath = publicPaths.some((p) =>
+        window.location.pathname.startsWith(p),
+      );
+      const isOAuthCallback = window.location.pathname.startsWith("/oauth/");
+
+      if (!isPublicPath && !isOAuthCallback) {
+        navigate("/landing");
+      }
     } finally {
       setLoading(false);
     }

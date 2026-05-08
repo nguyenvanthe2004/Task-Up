@@ -49,7 +49,7 @@ export class TaskController {
   ) {
     return await this.taskService.create(
       data.listId,
-      data.statusId,
+      data.statusId!,
       data,
       user,
     );
@@ -59,8 +59,9 @@ export class TaskController {
   async update(
     @Param("id") id: number,
     @Body({ validate: true }) data: UpdateTaskDto,
+    @CurrentUser() user: UserProps,
   ) {
-    return await this.taskService.update(id, data);
+    return await this.taskService.update(id, data, user);
   }
 
   @Delete("/:id")

@@ -86,7 +86,12 @@ export default function Register() {
 
       dispatch(setCurrentUser(res.data.user));
       toastSuccess("Login successfully");
-      navigate("/");
+      const userWorkspaces = res.data.user.workspaces;
+      if (userWorkspaces.length > 0) {
+        navigate(`/${userWorkspaces[0].id}`);
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       toastError(error.message);
     }

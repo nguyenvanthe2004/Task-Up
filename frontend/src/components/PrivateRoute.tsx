@@ -1,4 +1,3 @@
-// components/auth/PrivateRoute.tsx
 import { Navigate, Outlet } from "react-router-dom";
 
 interface Props {

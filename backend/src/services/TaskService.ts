@@ -8,6 +8,7 @@ import { UserProps } from "../types/auth";
 import { StatusRepository } from "../repositories/StatusRepository";
 import { CategoryRepository } from "../repositories/CategoryRepository";
 import { CreateTask, UpdateTask } from "../types/task";
+import { ActivityService } from "./ActivityService";
 
 @Service()
 export class TaskService {
@@ -29,6 +30,9 @@ export class TaskService {
 
     @Inject(() => CategoryRepository)
     private readonly categoryRepo: CategoryRepository,
+
+    @Inject(() => ActivityService)
+    private readonly activityService: ActivityService,
   ) {}
 
   private async assertIsOwner(
@@ -87,8 +91,27 @@ export class TaskService {
     return await this.taskRepo.create(listId, statusId, data);
   }
 
-  async update(id: number, data: UpdateTask) {
-    return await this.taskRepo.update(id, data);
+  async update(id: number, data: UpdateTask, user: UserProps) {
+    const task = await this.taskRepo.findById(id);
+    if (!task) throw new NotFoundError("Task not found");
+
+    const oldStatusId = task.statusId;
+
+    const updatedTask = await this.taskRepo.update(id, data);
+
+    // Nếu status thay đổi → tự động ghi activity log
+    if (data.statusId !== undefined && data.statusId !== oldStatusId) {
+      const newStatus = await this.statusRepo.findById(data.statusId);
+      if (!newStatus) throw new BadRequestError("Status not found");
+
+      await this.activityService.logStatusChange(
+        id,
+        user,
+        newStatus.name,
+      );
+    }
+
+    return updatedTask;
   }
 
   async delete(id: number, user: UserProps) {
