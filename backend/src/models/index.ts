@@ -9,6 +9,7 @@ import Task from "./Task";
 import Status from "./Status";
 import TaskAssignee from "./TaskAssignee";
 import Comment from "./Comment";
+import Activity from "./Activity";
 
 const initModels = () => {
   User.belongsToMany(Workspace, {
@@ -173,6 +174,24 @@ const initModels = () => {
     foreignKey: "taskId",
     as: "comments",
   });
+
+  User.hasMany(Activity, {
+    foreignKey: "userId",
+    as: "activities",
+  });
+  Activity.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user",
+  });
+
+  Task.hasMany(Activity, {
+    foreignKey: "taskId",
+    as: "activities",
+  });
+  Activity.belongsTo(Task, {
+    foreignKey: "taskId",
+    as: "task",
+  });
 };
 
 export {
@@ -187,5 +206,6 @@ export {
   Status,
   TaskAssignee,
   Comment,
+  Activity
 };
 export default initModels;
