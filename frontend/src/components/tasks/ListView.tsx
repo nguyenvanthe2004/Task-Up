@@ -103,7 +103,16 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
       setGroups((prev) =>
         prev.map((g) => ({
           ...g,
-          tasks: g.tasks.map((t) => (t.id === id ? { ...t, ...data } : t)),
+          tasks: g.tasks.map((t) => {
+            if (t.id !== id) return t;
+            const updatedAssignees = data.assignees
+              ? members.filter((m) =>
+                  (data.assignees as number[]).includes(m.id),
+                )
+              : t.assignees;
+
+            return { ...t, ...data, assignees: updatedAssignees };
+          }),
         })),
       );
     } catch {
@@ -556,7 +565,10 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                 <button
                   onClick={() => {
                     const firstId = [...checkedIds][0];
-                    if (firstId) setEditingTaskId(firstId);
+                    if (firstId) {
+                      setEditingTaskId(firstId);
+                      setCheckedIds(new Set());
+                    }
                   }}
                   className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
                 >

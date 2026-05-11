@@ -6,6 +6,7 @@ import { DetailTaskProps } from "../../types/task";
 import { priorityBadge, priorityColor } from "../../constants";
 import { AvatarStack } from "../ui/AvatarStack";
 import { Comment } from "../../types/comment";
+import { Attachment } from "../../types/attachment";
 import { toastError, toastSuccess } from "../../lib/toast";
 import {
   callCreateComment,
@@ -13,6 +14,11 @@ import {
   callGetComments,
   callUpdateComment,
 } from "../../services/comment";
+import {
+  callGetAttachments,
+  callUploadAttachments,
+  callDeleteAttachment,
+} from "../../services/attachment";
 import { useForm } from "react-hook-form";
 import {
   CreateCommentFormData,
@@ -29,19 +35,6 @@ import { Pencil, Trash2 } from "lucide-react";
 import { Activity } from "../../types/activity";
 import { callGetActivities } from "../../services/activity";
 
-const ATTACHMENT_IMAGES = [
-  {
-    key: "attachment-img-0",
-    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuDnDCRfqEjazffln1iVinE4lFu7ACzVJmx38KwLLF5ogLb3ByO9RhJ6VWvf-8mKGOvaedaVmcEoX8vw8lOTetsSxAmZwC7uDpUwzf6xQU05RspGKvaOWH7EZM2weYehc-eNUoTRhxkwgu0FC7dko3B2B5gr6zT0UnGUFl9ufesYLA3cLxlvP1Qi-Km65eAH7QeB1Uc2gtsJvWUoyhD_pKijuT_bTM7yygbk_t6ohfxn08y6hR98E2aSz9F5gVBonvdndy3wY4r5224",
-    alt: "Design 1",
-  },
-  {
-    key: "attachment-img-1",
-    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuBhA7LMY0TIbq6q5sSikMdUiDE1VdniXnHGGETpBxLvi4eAVcIaZMU7bK6PDl6I8ARn-FWWOuzKqLEwPurtedzmMHvL3XiWCMynwkWBCWTKqxsxuIWKZ3r3d6MSIQ0CV4KI3TZRcQ6Z961vvKfrnfcExE5yqRUybuHM1mc77Q8V_2JXd4SYtpnS_Ewam-kGqVvn0VMWNJPGjkBZbOhuTNIllwbfVGBLonXvPshUd5DNJsU-Ia7_fWrVmez0JB_KFubkGtu5r66tgEE",
-    alt: "Design 2",
-  },
-];
-
 const DetailTask: React.FC<DetailTaskProps> = ({
   task,
   statuses = [],
@@ -54,6 +47,12 @@ const DetailTask: React.FC<DetailTaskProps> = ({
   );
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<
+    number | null
+  >(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -67,7 +66,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({
     statuses.find((s) => s.id === task.statusId) ?? task.status?.[0] ?? null;
   const priority = task.priority ?? null;
 
-  const currentUser = useSelector((state: RootState) => state.auth.currentUser);
+  const currentUser = useSelector((state: RootState) => state?.auth.currentUser);
 
   const {
     register: registerCreate,
@@ -108,10 +107,53 @@ const DetailTask: React.FC<DetailTaskProps> = ({
     }
   };
 
+  const fetchAttachments = async () => {
+    try {
+      const res = await callGetAttachments(task.id);
+      setAttachments(res.data);
+    } catch (error: any) {
+      console.error(error.message);
+    }
+  };
+
+  const handleUploadAttachments = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    try {
+      setUploadingAttachment(true);
+      await callUploadAttachments(task.id, files);
+      await fetchAttachments();
+      toastSuccess("Uploaded successfully");
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteAttachment = async (id: number) => {
+    try {
+      setDeletingAttachmentId(id);
+      await callDeleteAttachment(id);
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+    } catch (error: any) {
+      toastError(error.message);
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        await Promise.all([fetchComments(), fetchActivities()]);
+        await Promise.all([
+          fetchComments(),
+          fetchActivities(),
+          fetchAttachments(),
+        ]);
       } catch (error) {
         console.error(error);
       }
@@ -410,55 +452,103 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             <div className="mb-3.5 flex items-center justify-between">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
                 Attachments{" "}
-                <span className="font-normal text-stone-300">(4)</span>
-              </h3>
-              <button className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-colors hover:bg-indigo-50">
-                <span className="material-symbols-outlined text-[13px]">
-                  add
+                <span className="font-normal text-stone-300">
+                  ({attachments.length})
                 </span>
+              </h3>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAttachment}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-colors hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {uploadingAttachment ? (
+                  <span className="material-symbols-outlined animate-spin text-[13px]">
+                    progress_activity
+                  </span>
+                ) : (
+                  <span className="material-symbols-outlined text-[13px]">
+                    add
+                  </span>
+                )}
                 Add
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                onChange={handleUploadAttachments}
+              />
             </div>
 
-            {/* FIX: tất cả children trong grid này đều có key rõ ràng */}
-            <div className="grid grid-cols-4 gap-2.5">
-              {ATTACHMENT_IMAGES.map((img) => (
-                <div
-                  key={img.key}
-                  className="group aspect-video cursor-pointer overflow-hidden rounded-xl border border-stone-200 transition-all hover:border-stone-400 hover:shadow-md"
-                >
-                  <img
-                    src={img.src}
-                    alt={img.alt}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-              ))}
+            {attachments.length === 0 ? (
+              <p className="py-4 text-center text-[12px] text-stone-400">
+                No attachments yet.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {attachments.map((att) => {
+                  const isImage = att.type.startsWith("image/");
+                  const isDeleting = deletingAttachmentId === att.id;
+                  return (
+                    <div
+                      key={att.id}
+                      className="group flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 transition-all hover:border-stone-300 hover:shadow-sm"
+                    >
+                      <a
+                        href={att.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0"
+                      >
+                        {isImage ? (
+                          <img
+                            src={att.fileUrl}
+                            alt={att.fileName}
+                            className="h-10 w-10 rounded-lg object-cover border border-stone-200"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100">
+                            <span className="material-symbols-outlined text-[20px] text-stone-400">
+                              description
+                            </span>
+                          </div>
+                        )}
+                      </a>
 
-              <div
-                key="attachment-specs-pdf"
-                className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-red-50 transition-all hover:border-red-300 hover:shadow-md"
-              >
-                <span className="material-symbols-outlined text-[22px] text-red-400">
-                  description
-                </span>
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-red-500">
-                  Specs.pdf
-                </span>
-              </div>
+                      <a
+                        href={att.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1"
+                      >
+                        <p className="truncate text-[13px] font-medium text-stone-700 hover:text-indigo-600">
+                          {att.fileName}
+                        </p>
+                        <p className="text-[11px] text-stone-400">{att.type}</p>
+                      </a>
 
-              <div
-                key="attachment-budget-csv"
-                className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-emerald-50 transition-all hover:border-emerald-300 hover:shadow-md"
-              >
-                <span className="material-symbols-outlined text-[22px] text-emerald-500">
-                  table_chart
-                </span>
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-emerald-600">
-                  Budget.csv
-                </span>
+                      <button
+                        onClick={() => handleDeleteAttachment(att.id)}
+                        disabled={isDeleting}
+                        className="shrink-0 rounded-full p-1 text-stone-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 disabled:opacity-50"
+                      >
+                        {isDeleting ? (
+                          <span className="material-symbols-outlined animate-spin text-[16px]">
+                            progress_activity
+                          </span>
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">
+                            close
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </section>
 
           {/* ── Activity ── */}
@@ -483,44 +573,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                 ))}
               </div>
             </div>
-
-            {(activeTab === "all" || activeTab === "activity") && (
-              <div className="mb-4 flex flex-col gap-2">
-                {activities.length === 0 ? (
-                  <p className="py-4 text-center text-[12px] text-stone-400">
-                    No activity yet.
-                  </p>
-                ) : (
-                  activities.map((activity) => (
-                    <div
-                      key={`activity-${activity.id}`}
-                      className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400 self-center"
-                    >
-                      <span className="material-symbols-outlined text-[12px]">
-                        info
-                      </span>
-                      <span>
-                        {(() => {
-                          const match = activity.action.match(/^(.+ to )(.+)$/);
-                          if (!match) return activity.action;
-                          return (
-                            <>
-                              {match[1]}
-                              <strong className="font-semibold text-stone-600">
-                                {match[2]}
-                              </strong>
-                            </>
-                          );
-                        })()}
-                      </span>
-                      <span>·</span>
-                      <span>{dayjs(activity.createdAt).fromNow()}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
             {(activeTab === "all" || activeTab === "comments") && (
               <div className="flex flex-col gap-1">
                 {comments.length === 0 && (
@@ -640,6 +692,30 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {(activeTab === "all" || activeTab === "activity") && (
+              <div className="mb-4 flex flex-col gap-2">
+                {activities.length === 0 ? (
+                  <p className="py-4 text-center text-[12px] text-stone-400">
+                    No activity yet.
+                  </p>
+                ) : (
+                  activities.map((activity) => (
+                    <div
+                      key={`activity-${activity.id}`}
+                      className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-400 self-center"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">
+                        info
+                      </span>
+                      <span>{activity.action}</span>
+                      <span>·</span>
+                      <span>{dayjs(activity.createdAt).fromNow()}</span>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 

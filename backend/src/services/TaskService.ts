@@ -88,7 +88,11 @@ export class TaskService {
       throw new BadRequestError("Only workspace owner can create task");
     }
 
-    return await this.taskRepo.create(listId, statusId, data);
+    const task = await this.taskRepo.create(listId, statusId, data);
+
+    await this.activityService.logCreated(task.id, user, task.name);
+
+    return task;
   }
 
   async update(id: number, data: UpdateTask, user: UserProps) {
@@ -96,19 +100,29 @@ export class TaskService {
     if (!task) throw new NotFoundError("Task not found");
 
     const oldStatusId = task.statusId;
+    const oldName = task.name;
+    const oldPriority = task.priority;
+    const oldDueDate = task.dueDate ? new Date(task.dueDate).toDateString() : null;
+    const newDueDate = data.dueDate ? new Date(data.dueDate).toDateString() : null;
 
     const updatedTask = await this.taskRepo.update(id, data);
 
-    // Nếu status thay đổi → tự động ghi activity log
     if (data.statusId !== undefined && data.statusId !== oldStatusId) {
       const newStatus = await this.statusRepo.findById(data.statusId);
       if (!newStatus) throw new BadRequestError("Status not found");
+      await this.activityService.logStatusChange(id, user, newStatus.name);
+    }
 
-      await this.activityService.logStatusChange(
-        id,
-        user,
-        newStatus.name,
-      );
+    if (data.name !== undefined && data.name !== oldName) {
+      await this.activityService.logRenamed(id, user, oldName, data.name);
+    }
+
+    if (data.priority !== undefined && data.priority !== oldPriority) {
+      await this.activityService.logPriorityChange(id, user, data.priority);
+    }
+
+    if (data.dueDate !== undefined && newDueDate !== oldDueDate) {
+      await this.activityService.logDueDateChange(id, user, data.dueDate ?? null);
     }
 
     return updatedTask;
@@ -131,6 +145,8 @@ export class TaskService {
     if (!isOwner) {
       throw new BadRequestError("Only workspace owner can delete task");
     }
+
+    await this.activityService.logDeleted(id, user, task.name);
 
     return await this.taskRepo.delete(id);
   }
