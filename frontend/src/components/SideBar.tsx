@@ -353,11 +353,7 @@ const SideBar: React.FC = () => {
                               ? "bg-indigo-50/70 text-indigo-600"
                               : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                           }`}
-                          onClick={() =>
-                            navigate(
-                              `/${workspaceId}/spaces/${space.id}/${cat.id}`,
-                            )
-                          }
+                          onClick={() => navigateToSpace(Number(space.id))}
                         >
                           <span className="truncate">{cat.name}</span>
                         </button>

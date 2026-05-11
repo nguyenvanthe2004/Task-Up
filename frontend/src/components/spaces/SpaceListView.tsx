@@ -28,7 +28,6 @@ import InlineEditRow from "../tools/InlineEditRow";
 import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
 
-
 interface StatusGroup {
   status: Status;
   tasks: Task[];
@@ -42,11 +41,12 @@ interface CategoryWithGroups extends Category {
   lists: ListWithGroups[];
 }
 
-
 const SpaceListView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
 
-  const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
+    [],
+  );
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selected, setSelected] = useState<Task | null>(null);
@@ -59,11 +59,12 @@ const SpaceListView: React.FC = () => {
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(
+    new Set(),
+  );
   const [collapsedLists, setCollapsedLists] = useState<Set<number>>(new Set());
 
   const { isOpen, open, close } = useModal();
-
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -79,28 +80,30 @@ const SpaceListView: React.FC = () => {
       setStatuses(sorted);
       setMembers(memberRes.data.members ?? []);
 
-      const built: CategoryWithGroups[] = (categoryRes.data as Category[]).map((cat) => ({
-        ...cat,
-        lists: (cat.lists ?? []).map((list) => {
-          const tasks: Task[] = (list as any).tasks ?? [];
+      const built: CategoryWithGroups[] = (categoryRes.data as Category[]).map(
+        (cat) => ({
+          ...cat,
+          lists: (cat.lists ?? []).map((list) => {
+            const tasks: Task[] = (list as any).tasks ?? [];
 
-          const taskMap = new Map<number, Task[]>();
-          for (const task of tasks) {
-            if (task.statusId) {
-              if (!taskMap.has(task.statusId)) taskMap.set(task.statusId, []);
-              taskMap.get(task.statusId)!.push(task);
+            const taskMap = new Map<number, Task[]>();
+            for (const task of tasks) {
+              if (task.statusId) {
+                if (!taskMap.has(task.statusId)) taskMap.set(task.statusId, []);
+                taskMap.get(task.statusId)!.push(task);
+              }
             }
-          }
 
-          return {
-            ...list,
-            statusGroups: sorted.map((s) => ({
-              status: s,
-              tasks: taskMap.get(s.id) || [],
-            })),
-          } as ListWithGroups;
+            return {
+              ...list,
+              statusGroups: sorted.map((s) => ({
+                status: s,
+                tasks: taskMap.get(s.id) || [],
+              })),
+            } as ListWithGroups;
+          }),
         }),
-      }));
+      );
 
       setCategoryGroups(built);
     } catch {
@@ -114,11 +117,29 @@ const SpaceListView: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.map((t) => {
+                if (t.id !== id) return t;
+                const updatedAssignees = data.assignees
+                  ? members.filter((m) =>
+                      (data.assignees as number[]).includes(m.id),
+                    )
+                  : t.assignees;
+                return { ...t, ...data, assignees: updatedAssignees };
+              }),
+            })),
+          })),
+        })),
+      );
     } catch {
       toastError("Failed to update task.");
     }
@@ -144,12 +165,39 @@ const SpaceListView: React.FC = () => {
     try {
       setBulkActionLoading(true);
       await Promise.all(
-        [...checkedIds].map((id) => callUpdateTask(id, { statusId } as UpdateTask)),
+        [...checkedIds].map((id) =>
+          callUpdateTask(id, { statusId } as UpdateTask),
+        ),
       );
       toastSuccess("Status updated.");
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => {
+            const movedTasks: Task[] = [];
+            const withoutMoved = list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.filter((t) => {
+                if (checkedIds.has(t.id)) {
+                  movedTasks.push({ ...t, statusId });
+                  return false;
+                }
+                return true;
+              }),
+            }));
+            return {
+              ...list,
+              statusGroups: withoutMoved.map((sg) =>
+                sg.status.id === statusId
+                  ? { ...sg, tasks: [...sg.tasks, ...movedTasks] }
+                  : sg,
+              ),
+            };
+          }),
+        })),
+      );
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
     } catch {
       toastError("Failed to update status.");
     } finally {
@@ -166,10 +214,24 @@ const SpaceListView: React.FC = () => {
         ),
       );
       toastSuccess("Assigned successfully.");
+      const newAssignees = members.filter((m) => memberIds.includes(m.id));
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.map((t) =>
+                checkedIds.has(t.id) ? { ...t, assignees: newAssignees } : t,
+              ),
+            })),
+          })),
+        })),
+      );
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
-    } catch(error: any) {
+    } catch (error: any) {
       toastError(error.message);
     } finally {
       setBulkActionLoading(false);
@@ -196,7 +258,10 @@ const SpaceListView: React.FC = () => {
           const withoutSource = list.statusGroups.map((sg) => {
             if (sg.status.id !== fromStatusId) return sg;
             moved = sg.tasks[source.index];
-            return { ...sg, tasks: sg.tasks.filter((_, i) => i !== source.index) };
+            return {
+              ...sg,
+              tasks: sg.tasks.filter((_, i) => i !== source.index),
+            };
           });
           if (!moved) return list;
           return {
@@ -209,15 +274,22 @@ const SpaceListView: React.FC = () => {
             }),
           };
         }),
-      }))
+      })),
     );
 
     if (fromStatusId !== toStatusId)
       handleUpdate(taskId, { statusId: toStatusId } as any);
   };
 
-
-  const HEADERS = ["Task Name", "Assignees", "Status", "Priority", "Start Date", "Due Date", "Tag"];
+  const HEADERS = [
+    "Task Name",
+    "Assignees",
+    "Status",
+    "Priority",
+    "Start Date",
+    "Due Date",
+    "Tag",
+  ];
 
   const makeColumns = (groupTasks: Task[]) => [
     {
@@ -285,7 +357,10 @@ const SpaceListView: React.FC = () => {
               border: `1px solid ${s.color}30`,
             }}
           >
-            <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+            <span
+              className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: s.color }}
+            />
             {s.name}
           </span>
         ) : (
@@ -320,7 +395,9 @@ const SpaceListView: React.FC = () => {
       render: (row: Task) => {
         const overdue = row.dueDate && new Date(row.dueDate) < new Date();
         return (
-          <span className={`text-[12px] font-medium tabular-nums ${overdue ? "text-red-400" : "text-stone-400"}`}>
+          <span
+            className={`text-[12px] font-medium tabular-nums ${overdue ? "text-red-400" : "text-stone-400"}`}
+          >
             {fmtDate(row.dueDate)}
           </span>
         );
@@ -339,14 +416,17 @@ const SpaceListView: React.FC = () => {
     },
   ];
 
-
   const renderStatusGroup = (sg: StatusGroup, listId: number) => {
     const droppableId = `${listId}-${sg.status.id}`;
 
     return (
       <Droppable droppableId={droppableId} key={droppableId}>
         {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps} className="mb-4">
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className="mb-4"
+          >
             {/* status sub-header */}
             <div className="flex items-center gap-2 mb-1.5 px-1">
               <span
@@ -368,7 +448,10 @@ const SpaceListView: React.FC = () => {
                 style={{ gridTemplateColumns: GRID_COLS }}
               >
                 {HEADERS.map((h, i) => (
-                  <span key={i} className="text-[10px] font-bold uppercase tracking-widest text-stone-400 px-1">
+                  <span
+                    key={i}
+                    className="text-[10px] font-bold uppercase tracking-widest text-stone-400 px-1"
+                  >
                     {h}
                   </span>
                 ))}
@@ -402,7 +485,7 @@ const SpaceListView: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  )
+                  ),
                 )}
               </div>
 
@@ -425,7 +508,9 @@ const SpaceListView: React.FC = () => {
                 onClick={() => setOpenInlineKey(droppableId)}
                 className="flex w-full items-center gap-2 px-4 py-2 text-[12px] font-medium text-stone-400 hover:text-indigo-500 hover:bg-indigo-50/40 transition-colors border-t border-stone-50 rounded-b-xl"
               >
-                <span className="material-symbols-outlined text-[15px]">add</span>
+                <span className="material-symbols-outlined text-[15px]">
+                  add
+                </span>
                 Add task
               </button>
             </div>
@@ -439,7 +524,10 @@ const SpaceListView: React.FC = () => {
 
   const renderList = (list: ListWithGroups) => {
     const isCollapsed = collapsedLists.has(list.id);
-    const totalTasks = list.statusGroups.reduce((acc, sg) => acc + sg.tasks.length, 0);
+    const totalTasks = list.statusGroups.reduce(
+      (acc, sg) => acc + sg.tasks.length,
+      0,
+    );
 
     return (
       <div key={list.id} className="mb-6">
@@ -455,7 +543,9 @@ const SpaceListView: React.FC = () => {
         >
           <span
             className="material-symbols-outlined text-[16px] text-stone-400 transition-transform"
-            style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
+            style={{
+              transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
           >
             expand_more
           </span>
@@ -499,9 +589,7 @@ const SpaceListView: React.FC = () => {
           >
             expand_more
           </span>
-          <span
-            className="text-[14px] font-bold tracking-wide group-hover/cat:opacity-80 transition-opacity"
-          >
+          <span className="text-[14px] font-bold tracking-wide group-hover/cat:opacity-80 transition-opacity">
             {cat.name}
           </span>
           <span
@@ -514,17 +602,12 @@ const SpaceListView: React.FC = () => {
 
         {!isCollapsed && (
           <div>
-            {cat.lists.length === 0 ? (
-              <NotFound />
-            ) : (
-              cat.lists.map(renderList)
-            )}
+            {cat.lists.length === 0 ? <NotFound /> : cat.lists.map(renderList)}
           </div>
         )}
       </div>
     );
   };
-
 
   return (
     <div className="w-full">
@@ -548,7 +631,9 @@ const SpaceListView: React.FC = () => {
         <DragDropContext onDragEnd={onDragEnd}>
           {categoryGroups.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-24 text-stone-300">
-              <span className="material-symbols-outlined text-[52px]">folder</span>
+              <span className="material-symbols-outlined text-[52px]">
+                folder
+              </span>
               <p className="text-sm font-medium">No categories yet</p>
             </div>
           ) : (
@@ -584,33 +669,61 @@ const SpaceListView: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setBulkStatusOpen(true); setBulkAssignOpen(false); }}
+                onClick={() => {
+                  setBulkStatusOpen(true);
+                  setBulkAssignOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">assignment_turned_in</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Status</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  assignment_turned_in
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Status
+                </span>
               </button>
               <button
-                onClick={() => { setBulkAssignOpen(true); setBulkStatusOpen(false); }}
+                onClick={() => {
+                  setBulkAssignOpen(true);
+                  setBulkStatusOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">person_add</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Assign</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  person_add
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Assign
+                </span>
               </button>
               <button
-                onClick={() => { const firstId = [...checkedIds][0]; if (firstId) setEditingTaskId(firstId); }}
+                onClick={() => {
+                  const firstId = [...checkedIds][0];
+                  if (firstId) {
+                    setEditingTaskId(firstId);
+                    setCheckedIds(new Set());
+                  }
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">edit</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Edit</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  edit
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Edit
+                </span>
               </button>
               <button
                 onClick={open}
                 disabled={deleting}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">delete</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Delete</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  delete
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Delete
+                </span>
               </button>
               <button
                 onClick={() => setCheckedIds(new Set())}
@@ -633,7 +746,10 @@ const SpaceListView: React.FC = () => {
         loading={deleting}
         title="Delete Task?"
         description="Are you sure you want to delete this task? This action cannot be undone."
-        onClose={() => { close(); setDeleteId(null); }}
+        onClose={() => {
+          close();
+          setDeleteId(null);
+        }}
         onConfirm={handleBulkDelete}
       />
 
@@ -643,7 +759,9 @@ const SpaceListView: React.FC = () => {
           statuses={statuses}
           onClose={() => setSelected(null)}
           onUpdate={(data: UpdateTask) => handleUpdate(selected.id, data)}
-          onDelete={() => { setDeleteId(selected.id); }}
+          onDelete={() => {
+            setDeleteId(selected.id);
+          }}
         />
       )}
     </div>

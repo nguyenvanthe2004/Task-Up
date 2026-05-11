@@ -4,6 +4,7 @@ import { UserProps } from "../types/auth";
 import { CommentRepository } from "../repositories/CommentRepository";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { CreateCommentInput, UpdateCommentInput } from "../types/comment";
+import { ActivityService } from "./ActivityService";
 
 @Service()
 export class CommentService {
@@ -12,6 +13,8 @@ export class CommentService {
     private readonly commentRepo: CommentRepository,
     @Inject(() => TaskRepository)
     private readonly taskRepo: TaskRepository,
+    @Inject(() => ActivityService)
+    private readonly activityService: ActivityService,
   ) {}
 
   async findAll(taskId?: number) {
@@ -31,7 +34,9 @@ export class CommentService {
     const task = await this.taskRepo.findById(data.taskId);
     if (!task) throw new NotFoundError("Task not found");
 
-    return await this.commentRepo.create(user.id, data);
+    const comment = await this.commentRepo.create(user.id, data);
+    await this.activityService.logCommentAdded(data.taskId, user);
+    return comment;
   }
 
   async update(id: number, data: UpdateCommentInput, user: UserProps) {
@@ -51,6 +56,8 @@ export class CommentService {
     if (comment.userId !== user.id)
       throw new BadRequestError("You can only delete your own comments");
 
-    return await this.commentRepo.delete(id);
+    await this.commentRepo.delete(id);
+    await this.activityService.logCommentDeleted(comment.taskId, user);
+    return { success: true };
   }
 }

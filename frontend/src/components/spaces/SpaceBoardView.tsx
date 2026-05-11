@@ -35,7 +35,9 @@ interface CategoryWithGroups extends Category {
 const SpaceBoardView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
 
-  const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
+    [],
+  );
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,11 +54,16 @@ const SpaceBoardView: React.FC = () => {
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(
+    new Set(),
+  );
   const [collapsedLists, setCollapsedLists] = useState<Set<number>>(new Set());
 
-  const [dragging, setDragging] = useState<{ taskId: number; fromStatusId: number } | null>(null);
-  const [dragOver, setDragOver] = useState<string | null>(null); 
+  const [dragging, setDragging] = useState<{
+    taskId: number;
+    fromStatusId: number;
+  } | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   const { isOpen, open, close } = useModal();
 
@@ -74,28 +81,30 @@ const SpaceBoardView: React.FC = () => {
       setStatuses(sorted);
       setMembers(memberRes.data.members ?? []);
 
-      const built: CategoryWithGroups[] = (categoryRes.data as Category[]).map((cat) => ({
-        ...cat,
-        lists: (cat.lists ?? []).map((list) => {
-          const tasks: Task[] = (list as any).tasks ?? [];
+      const built: CategoryWithGroups[] = (categoryRes.data as Category[]).map(
+        (cat) => ({
+          ...cat,
+          lists: (cat.lists ?? []).map((list) => {
+            const tasks: Task[] = (list as any).tasks ?? [];
 
-          const taskMap = new Map<number, Task[]>();
-          for (const task of tasks) {
-            if (task.statusId) {
-              if (!taskMap.has(task.statusId)) taskMap.set(task.statusId, []);
-              taskMap.get(task.statusId)!.push(task);
+            const taskMap = new Map<number, Task[]>();
+            for (const task of tasks) {
+              if (task.statusId) {
+                if (!taskMap.has(task.statusId)) taskMap.set(task.statusId, []);
+                taskMap.get(task.statusId)!.push(task);
+              }
             }
-          }
 
-          return {
-            ...list,
-            statusGroups: sorted.map((s) => ({
-              status: s,
-              tasks: taskMap.get(s.id) ?? [],
-            })),
-          } as ListWithGroups;
+            return {
+              ...list,
+              statusGroups: sorted.map((s) => ({
+                status: s,
+                tasks: taskMap.get(s.id) ?? [],
+              })),
+            } as ListWithGroups;
+          }),
         }),
-      }));
+      );
 
       setCategoryGroups(built);
     } catch {
@@ -105,12 +114,33 @@ const SpaceBoardView: React.FC = () => {
     }
   }, [spaceId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
-      await fetchData();
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.map((t) => {
+                if (t.id !== id) return t;
+                const updatedAssignees = data.assignees
+                  ? members.filter((m) =>
+                      (data.assignees as number[]).includes(m.id),
+                    )
+                  : t.assignees;
+                return { ...t, ...data, assignees: updatedAssignees };
+              }),
+            })),
+          })),
+        })),
+      );
     } catch {
       toastError("Failed to update task.");
     }
@@ -136,12 +166,39 @@ const SpaceBoardView: React.FC = () => {
     try {
       setBulkActionLoading(true);
       await Promise.all(
-        [...checkedIds].map((id) => callUpdateTask(id, { statusId } as UpdateTask))
+        [...checkedIds].map((id) =>
+          callUpdateTask(id, { statusId } as UpdateTask),
+        ),
       );
       toastSuccess("Status updated.");
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => {
+            const movedTasks: Task[] = [];
+            const withoutMoved = list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.filter((t) => {
+                if (checkedIds.has(t.id)) {
+                  movedTasks.push({ ...t, statusId });
+                  return false;
+                }
+                return true;
+              }),
+            }));
+            return {
+              ...list,
+              statusGroups: withoutMoved.map((sg) =>
+                sg.status.id === statusId
+                  ? { ...sg, tasks: [...sg.tasks, ...movedTasks] }
+                  : sg,
+              ),
+            };
+          }),
+        })),
+      );
       setBulkStatusOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
     } catch {
       toastError("Failed to update status.");
     } finally {
@@ -154,15 +211,29 @@ const SpaceBoardView: React.FC = () => {
       setBulkActionLoading(true);
       await Promise.all(
         [...checkedIds].map((id) =>
-          callUpdateTask(id, { assignees: memberIds } as UpdateTask)
-        )
+          callUpdateTask(id, { assignees: memberIds } as UpdateTask),
+        ),
       );
       toastSuccess("Assigned successfully.");
+      const newAssignees = members.filter((m) => memberIds.includes(m.id));
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.map((t) =>
+                checkedIds.has(t.id) ? { ...t, assignees: newAssignees } : t,
+              ),
+            })),
+          })),
+        })),
+      );
       setBulkAssignOpen(false);
       setCheckedIds(new Set());
-      await fetchData();
-    } catch {
-      toastError("Failed to assign.");
+    } catch (error: any) {
+      toastError(error.message);
     } finally {
       setBulkActionLoading(false);
     }
@@ -202,11 +273,11 @@ const SpaceBoardView: React.FC = () => {
             statusGroups: without.map((sg) =>
               sg.status.id === toStatusId
                 ? { ...sg, tasks: [moved!, ...sg.tasks] }
-                : sg
+                : sg,
             ),
           };
         }),
-      }))
+      })),
     );
 
     handleUpdate(taskId, { statusId: toStatusId } as UpdateTask);
@@ -235,7 +306,11 @@ const SpaceBoardView: React.FC = () => {
     return (
       <div
         className="flex items-start gap-3 pb-2"
-        style={{ overflowX: "auto", scrollbarWidth: "thin", scrollbarColor: "#e7e5e4 transparent" }}
+        style={{
+          overflowX: "auto",
+          scrollbarWidth: "thin",
+          scrollbarColor: "#e7e5e4 transparent",
+        }}
       >
         {list.statusGroups.map((sg) => {
           const colKey = `${list.id}-${sg.status.id}`;
@@ -248,12 +323,16 @@ const SpaceBoardView: React.FC = () => {
                 flex-none flex flex-col
                 w-[220px] sm:w-[240px] lg:w-56 xl:w-60
                 rounded-2xl border transition-all duration-150
-                ${isOver
-                  ? "border-indigo-300 bg-indigo-50/50 shadow-lg"
-                  : "border-stone-200/60 bg-white/60"
+                ${
+                  isOver
+                    ? "border-indigo-300 bg-indigo-50/50 shadow-lg"
+                    : "border-stone-200/60 bg-white/60"
                 }
               `}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(colKey); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(colKey);
+              }}
               onDragLeave={() => setDragOver(null)}
               onDrop={() => handleDrop(list.id, sg.status.id)}
             >
@@ -279,8 +358,18 @@ const SpaceBoardView: React.FC = () => {
                   className="p-1 rounded-lg text-stone-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors flex-none"
                   title="Add task"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4v16m8-8H4"
+                    />
                   </svg>
                 </button>
               </div>
@@ -324,10 +413,18 @@ const SpaceBoardView: React.FC = () => {
                       key={task.id}
                       draggable
                       onDragStart={() =>
-                        setDragging({ taskId: task.id, fromStatusId: sg.status.id })
+                        setDragging({
+                          taskId: task.id,
+                          fromStatusId: sg.status.id,
+                        })
                       }
-                      onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                      className={dragging?.taskId === task.id ? "opacity-40" : ""}
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setDragOver(null);
+                      }}
+                      className={
+                        dragging?.taskId === task.id ? "opacity-40" : ""
+                      }
                     >
                       <TaskCard
                         task={task}
@@ -345,13 +442,23 @@ const SpaceBoardView: React.FC = () => {
                         onCheck={toggleCheck}
                       />
                     </div>
-                  )
+                  ),
                 )}
 
                 {sg.tasks.length === 0 && openInlineKey !== colKey && (
                   <div className="flex flex-col items-center justify-center py-6 text-stone-300">
-                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <svg
+                      className="w-5 h-5 mb-1"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
                     </svg>
                     <p className="text-[11px] font-medium">No tasks</p>
                   </div>
@@ -367,8 +474,18 @@ const SpaceBoardView: React.FC = () => {
                   }}
                   className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-stone-200 rounded-xl text-stone-400 hover:text-indigo-500 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-[11px] font-semibold"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4v16m8-8H4"
+                    />
                   </svg>
                   Add task
                 </button>
@@ -382,7 +499,10 @@ const SpaceBoardView: React.FC = () => {
 
   const renderList = (list: ListWithGroups) => {
     const isCollapsed = collapsedLists.has(list.id);
-    const totalTasks = list.statusGroups.reduce((acc, sg) => acc + sg.tasks.length, 0);
+    const totalTasks = list.statusGroups.reduce(
+      (acc, sg) => acc + sg.tasks.length,
+      0,
+    );
 
     return (
       <div key={list.id} className="mb-6">
@@ -393,7 +513,9 @@ const SpaceBoardView: React.FC = () => {
         >
           <span
             className="material-symbols-outlined text-[16px] text-stone-400 transition-transform duration-200"
-            style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
+            style={{
+              transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
           >
             expand_more
           </span>
@@ -427,7 +549,9 @@ const SpaceBoardView: React.FC = () => {
         >
           <span
             className="material-symbols-outlined text-[18px] text-stone-500 transition-transform duration-200"
-            style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
+            style={{
+              transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
           >
             expand_more
           </span>
@@ -444,11 +568,7 @@ const SpaceBoardView: React.FC = () => {
 
         {!isCollapsed && (
           <div>
-            {cat.lists.length === 0 ? (
-              <NotFound />
-            ) : (
-              cat.lists.map(renderList)
-            )}
+            {cat.lists.length === 0 ? <NotFound /> : cat.lists.map(renderList)}
           </div>
         )}
       </div>
@@ -466,14 +586,20 @@ const SpaceBoardView: React.FC = () => {
                 <div className="h-4 w-24 rounded-md bg-stone-100" />
                 <div className="flex gap-3">
                   {[1, 2, 3, 4].map((k) => (
-                    <div key={k} className="flex-none w-56 rounded-2xl border border-stone-200/60 bg-white/60">
+                    <div
+                      key={k}
+                      className="flex-none w-56 rounded-2xl border border-stone-200/60 bg-white/60"
+                    >
                       <div className="px-3 pt-3 pb-2.5 flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-stone-200" />
                         <div className="h-3 w-16 rounded bg-stone-200" />
                       </div>
                       <div className="px-2.5 pb-3 space-y-2">
                         {[1, 2].map((l) => (
-                          <div key={l} className="h-20 rounded-xl bg-stone-100" />
+                          <div
+                            key={l}
+                            className="h-20 rounded-xl bg-stone-100"
+                          />
                         ))}
                       </div>
                     </div>
@@ -524,43 +650,72 @@ const SpaceBoardView: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setBulkStatusOpen(true); setBulkAssignOpen(false); }}
+                onClick={() => {
+                  setBulkStatusOpen(true);
+                  setBulkAssignOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">assignment_turned_in</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Status</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  assignment_turned_in
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Status
+                </span>
               </button>
               <button
-                onClick={() => { setBulkAssignOpen(true); setBulkStatusOpen(false); }}
+                onClick={() => {
+                  setBulkAssignOpen(true);
+                  setBulkStatusOpen(false);
+                }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">person_add</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Assign</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  person_add
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Assign
+                </span>
               </button>
               <button
                 onClick={() => {
                   const firstId = [...checkedIds][0];
-                  if (firstId) setEditingTaskId(firstId);
+                  if (firstId) {
+                    setEditingTaskId(firstId);
+                    setCheckedIds(new Set());
+                  }
                 }}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">edit</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Edit</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  edit
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Edit
+                </span>
               </button>
               <button
                 onClick={open}
                 disabled={deleting}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">delete</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Delete</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  delete
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Delete
+                </span>
               </button>
               <button
                 onClick={() => setCheckedIds(new Set())}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-stone-600 hover:bg-stone-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">close</span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">Clear</span>
+                <span className="material-symbols-outlined text-[18px] text-stone-400">
+                  close
+                </span>
+                <span className="text-[9px] font-bold uppercase text-stone-400">
+                  Clear
+                </span>
               </button>
             </div>
           </div>
@@ -573,7 +728,10 @@ const SpaceBoardView: React.FC = () => {
         loading={deleting}
         title="Delete Task?"
         description={`Are you sure you want to delete ${checkedIds.size > 1 ? `${checkedIds.size} tasks` : "this task"}? This action cannot be undone.`}
-        onClose={() => { close(); setDeleteId(null); }}
+        onClose={() => {
+          close();
+          setDeleteId(null);
+        }}
         onConfirm={handleBulkDelete}
       />
 

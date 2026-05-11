@@ -110,7 +110,15 @@ const SpaceCalendarView: React.FC = () => {
     try {
       await callUpdateTask(id, data);
       setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
+        prev.map((t) => {
+          if (t.id !== id) return t;
+
+          const updatedAssignees = data.assignees
+            ? members.filter((m) => (data.assignees as number[]).includes(m.id))
+            : t.assignees;
+
+          return { ...t, ...data, assignees: updatedAssignees };
+        }),
       );
     } catch {
       toastError("Failed to update.");

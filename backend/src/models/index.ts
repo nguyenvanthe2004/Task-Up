@@ -10,6 +10,7 @@ import Status from "./Status";
 import TaskAssignee from "./TaskAssignee";
 import Comment from "./Comment";
 import Activity from "./Activity";
+import Attachment from "./Attachment";
 
 const initModels = () => {
   User.belongsToMany(Workspace, {
@@ -192,6 +193,24 @@ const initModels = () => {
     foreignKey: "taskId",
     as: "task",
   });
+
+  Task.hasMany(Attachment, {
+    foreignKey: "taskId",
+    as: "attachments",
+  });
+  Attachment.belongsTo(Task, {
+    foreignKey: "taskId",
+    as: "task",
+  });
+
+  User.hasMany(Attachment, {
+    foreignKey: "uploadedBy",
+    as: "attachments",
+  });
+  Attachment.belongsTo(User, {
+    foreignKey: "uploadedBy",
+    as: "uploader",
+  });
 };
 
 export {
@@ -206,6 +225,7 @@ export {
   Status,
   TaskAssignee,
   Comment,
-  Activity
+  Activity,
+  Attachment
 };
 export default initModels;
