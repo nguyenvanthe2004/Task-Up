@@ -1,3 +1,5 @@
+import { User } from "./auth";
+
 export interface Workspace {
   id: number;
   name: string;
@@ -7,6 +9,7 @@ export interface Workspace {
   ownerId: {
     id: number;
   };
+  users: User[];
 }
 
 export interface UserWorkspace {

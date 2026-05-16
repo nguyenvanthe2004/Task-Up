@@ -20,7 +20,7 @@ export class AttachmentService {
     private readonly activityService: ActivityService,
   ) {}
 
-  async findByTaskId(taskId: number) {
+  async findByTaskId(taskId?: number) {
     const attachments = await this.attachmentRepo.findByTaskId(taskId);
     return attachments.map((a) => a.get({ plain: true }));
   }

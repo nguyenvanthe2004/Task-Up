@@ -60,3 +60,14 @@ export const stripHtml = (html: string) => {
   tmp.innerHTML = html;
   return tmp.textContent || tmp.innerText || "";
 };
+
+export function isToday(date?: string) {
+  if (!date) return false;
+  const d = new Date(date);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}

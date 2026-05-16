@@ -58,6 +58,10 @@ export class TaskService {
     return tasksByUser.map((task) => task.get({ plain: true }));
   }
 
+  async getSummary(user: UserProps) {
+    return await this.taskRepo.findSummaryByUser(user.id);
+  }
+
   async findById(id: number) {
     const task = await this.taskRepo.findById(id);
     if (!task) throw new NotFoundError("Task not found");

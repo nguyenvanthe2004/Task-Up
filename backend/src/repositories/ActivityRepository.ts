@@ -1,5 +1,5 @@
 import { Service } from "typedi";
-import { Task, User } from "../models";
+import { Category, List, Space, Task, User } from "../models";
 import Activity from "../models/Activity";
 import { CreateActivityInput, UpdateActivityInput } from "../types/activityLog";
 
@@ -18,9 +18,51 @@ export class ActivityRepository {
         {
           model: Task,
           as: "task",
+          attributes: ["id", "name"],
+          include: [
+            {
+              model: List,
+              as: "list",
+              attributes: ["id", "name"],
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                  attributes: ["id", "name"],
+                  include: [
+                    {
+                      model: Space,
+                      as: "space",
+                      attributes: ["id", "name"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       ],
       order: [["createdAt", "ASC"]],
+    });
+  }
+
+  async findRecent(userId: number, limit = 5) {
+    return await Activity.findAll({
+      where: { userId },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "fullName", "avatar"],
+        },
+        {
+          model: Task,
+          as: "task",
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit,
     });
   }
 

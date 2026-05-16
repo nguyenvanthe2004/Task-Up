@@ -6,6 +6,10 @@ export const callGetActivities = async (taskId?: number) => {
   });
 };
 
+export const callGetRecentActivities = async () => {
+  return await instance.get("/activities/recent");
+};
+
 export const callGetActivityById = async (id: number) => {
   return await instance.get(`/activities/${id}`);
 

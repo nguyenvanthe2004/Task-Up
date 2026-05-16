@@ -19,6 +19,11 @@ export class ActivityService {
     return activities.map((c) => c.get({ plain: true }));
   }
 
+  async getRecent(user: UserProps, limit = 5) {
+    const activities = await this.activityRepo.findRecent(user.id, limit);
+    return activities.map((a) => a.get({ plain: true }));
+  }
+
   async findById(id: number) {
     const activity = await this.activityRepo.findById(id);
     if (!activity) {

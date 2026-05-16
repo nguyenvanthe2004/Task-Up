@@ -15,26 +15,26 @@ import {
   BookMarked,
   Telescope,
 } from "lucide-react";
-const ICON_MAP: Record<
-  string,
-  React.FC<{ className?: string; strokeWidth?: number }>
-> = {
-  Kanban: FolderKanban,
-  Dashboard: LayoutDashboard,
-  Code: Code2,
-  Campaign: Megaphone,
-  Research: FlaskConical,
-  Docs: FileText,
-  Web: Globe,
-  Security: ShieldCheck,
-  Layers: Layers,
-  Media: MonitorPlay,
-  Data: Database,
-  Design: PenTool,
-  Inbox: Inbox,
-  Wiki: BookMarked,
-  Explore: Telescope,
-};
+
+export const ICONS = [
+  { icon: FolderKanban, label: "FolderKanban" },
+  { icon: LayoutDashboard, label: "LayoutDashboard" },
+  { icon: Code2, label: "Code2" },
+  { icon: Megaphone, label: "Megaphone" },
+  { icon: FlaskConical, label: "FlaskConical" },
+  { icon: FileText, label: "FileText" },
+  { icon: Globe, label: "Globe" },
+  { icon: ShieldCheck, label: "ShieldCheck" },
+  { icon: Layers, label: "Layers" },
+  { icon: MonitorPlay, label: "MonitorPlay" },
+  { icon: Database, label: "Database" },
+  { icon: PenTool, label: "PenTool" },
+  { icon: Inbox, label: "Inbox" },
+  { icon: BookMarked, label: "BookMarked" },
+  { icon: Telescope, label: "Telescope" },
+];
+
+const ICON_MAP = Object.fromEntries(ICONS.map(({ icon, label }) => [label, icon]));
 
 export const SpaceIcon = ({
   icon,

@@ -1,475 +1,303 @@
-import {
-  AlarmClockCheck,
-  ArrowRight,
-  Blend,
-  CalendarCheck,
-  Ellipsis,
-  FileText,
-  Folder,
-  Gauge,
-  SquarePlay,
-  Star,
-} from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Workspace } from "../../types/workspace";
+import { useSelector } from "react-redux";
+import { useNavigate, useParams } from "react-router-dom";
+import { callGetActivities } from "../../services/activity";
+import { callGetSpaces } from "../../services/space";
+import { callGetTaskByUser, callGetTaskSummary } from "../../services/task";
 import { callGetMyWorkspace } from "../../services/workspace";
+import { Activity } from "../../types/activity";
+import { Space } from "../../types/space";
+import { Task, TaskSummary } from "../../types/task";
+import { Workspace } from "../../types/workspace";
 import LoadingPage from "../ui/LoadingPage";
 import CreateWorkspaceModal from "../workspaces/CreateWorkspaceModal";
-import { useNavigate } from "react-router-dom";
+import QuickAccess from "./QuickAccess";
+import TaskList from "./TaskList";
+import StatsPanel from "./Statspanel";
+import { Attachment } from "../../types/attachment";
+import { isToday } from "../../lib/until";
+import { callGetAttachments } from "../../services/attachment";
+import { FileText, Inbox } from "lucide-react";
 
 const Home: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(true);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [summary, setSummary] = useState<TaskSummary | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openCreate, setOpenCreate] = useState(true);
   const navigate = useNavigate();
-
-  const fetchWorkspaces = async () => {
-    try {
-      setLoading(true);
-      const { data } = await callGetMyWorkspace();
-      setWorkspaces(data);
-    } catch (error: any) {
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { workspaceId } = useParams();
+  const user = useSelector((state: any) => state.auth.currentUser);
 
   useEffect(() => {
-    fetchWorkspaces();
-  }, []);
+    const fetchWorkspaces = async () => {
+      try {
+        const wsRes = await callGetMyWorkspace();
+        setWorkspaces(wsRes.data ?? []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user?.id) fetchWorkspaces();
+  }, [user?.id]);
 
-  if (loading) {
-    return <LoadingPage />;
-  }
+  useEffect(() => {
+    if (!workspaceId || workspaces.length === 0) return;
+
+    const fetchWorkspaceData = async () => {
+      setLoading(true);
+      try {
+        const [taskRes, summaryRes, actRes, atmRes, spaceRes] =
+          await Promise.allSettled([
+            callGetTaskByUser(user.id),
+            callGetTaskSummary(),
+            callGetActivities(),
+            callGetAttachments(),
+            callGetSpaces(Number(workspaceId)),
+          ]);
+
+        const allSpaces: Space[] =
+          spaceRes.status === "fulfilled" ? spaceRes.value.data : [];
+
+        const userSpaces = allSpaces.filter((sp: any) => {
+          if (Array.isArray(sp.members)) {
+            return sp.members.some(
+              (m: any) => (m.userId ?? m.id) === user.id
+            );
+          }
+          return true;
+        });
+
+        const spaceIds: Set<number> = new Set(userSpaces.map((sp) => sp.id));
+        setSpaces(userSpaces);
+
+        const allTasks: Task[] =
+          taskRes.status === "fulfilled" ? taskRes.value.data : [];
+
+        const userTasks =
+          spaceIds.size > 0
+            ? allTasks.filter((t) => {
+                const spaceId = (t.list as any)?.category?.space?.id;
+                return spaceId !== undefined && spaceIds.has(spaceId);
+              })
+            : allTasks; 
+        setTasks(userTasks);
+
+        if (summaryRes.status === "fulfilled") {
+          const raw = summaryRes.value.data as TaskSummary;
+          const completed = userTasks.filter(
+            (t) => (t.status as any)?.name?.toLowerCase() === "done",
+          ).length;
+          const total = userTasks.length;
+          const highPriority = userTasks.filter(
+            (t) => t.priority === "high" || t.priority === "urgent",
+          ).length;
+          const upcoming = userTasks.filter((t) => {
+            if (!t.dueDate) return false;
+            const diff = new Date(t.dueDate).getTime() - Date.now();
+            return diff > 0 && diff <= 48 * 60 * 60 * 1000;
+          }).length;
+          const dueToday = userTasks.filter((t) => isToday(t.dueDate)).length;
+          setSummary({ ...raw, completed, total, highPriority, upcoming, dueToday });
+        } else {
+          setSummary(null);
+        }
+
+        if (actRes.status === "fulfilled") {
+          const allAc: Activity[] = actRes.value.data;
+          const userActivities = allAc.filter((a) => {
+            const isOwner =
+              (a as any).userId === user.id ||
+              (a as any).user?.id === user.id;
+            const spaceId = a.task?.list?.category?.space?.id;
+            const inUserSpace =
+              spaceIds.size > 0
+                ? spaceId !== undefined && spaceIds.has(spaceId)
+                : true;
+            return isOwner && inUserSpace;
+          });
+          setActivities(userActivities);
+        } else {
+          setActivities([]);
+        }
+
+        if (atmRes.status === "fulfilled") {
+          const allAtm: Attachment[] = atmRes.value.data;
+          const userTaskIds = new Set(userTasks.map((t) => t.id));
+          const userAttachments = allAtm.filter((a) => {
+            return userTaskIds.has(a.taskId);
+          });
+          setAttachments(userAttachments);
+        } else {
+          setAttachments([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWorkspaceData();
+  }, [workspaceId, workspaces.length, user?.id]);
+
   if (workspaces.length === 0) {
     return (
       <CreateWorkspaceModal
-        isOpen={open}
+        isOpen={openCreate}
         onClose={() => {
           if (workspaces.length === 0) return;
-          setOpen(false);
+          setOpenCreate(false);
         }}
         onSuccess={(newWorkspace) => {
-          setWorkspaces((prev) => [...prev, newWorkspace]);
+          setWorkspaces([newWorkspace]);
           navigate(`/${newWorkspace.id}`);
         }}
       />
     );
-  } else {
-    return (
-      <div className="min-h-screen bg-slate-50 font-sans">
-        <div className="lg:pl-64 pt-10 min-h-screen">
-          <div className="p-5 sm:p-6 lg:p-8 max-w-8xl">
-            <section className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mb-1.5">
-                  Welcome back, Sarah 👋
-                </h1>
-                <p className="text-slate-500 text-sm">
-                  You have{" "}
-                  <span className="text-indigo-600 font-semibold">
-                    4 high-priority tasks
-                  </span>{" "}
-                  for today.
+  }
+
+  const todayTasks = tasks.filter((t) => isToday(t.dueDate));
+  const isEmpty =
+    tasks.length === 0 && spaces.length === 0 && activities.length === 0;
+
+  if (loading) return <LoadingPage />;
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="lg:pl-64 pt-10 min-h-screen">
+        <div className="p-5 sm:p-6 lg:p-8 max-w-8xl">
+          {/* Header */}
+          <section className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mb-1.5">
+                Welcome back, {user.fullName?.split(" ").pop()} 👋
+              </h1>
+              <p className="text-slate-500 text-sm">
+                {isEmpty ? (
+                  "Bạn chưa có dữ liệu nào trong workspace này."
+                ) : (
+                  <>
+                    Bạn có{" "}
+                    <span className="text-indigo-600 font-semibold">
+                      {summary?.highPriority ?? 0} task ưu tiên cao
+                    </span>{" "}
+                    được giao cho bạn.
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-3 sm:gap-4">
+              <div className="bg-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl border border-slate-100 shadow-sm min-w-[120px] sm:min-w-[140px]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                  Completed
                 </p>
-              </div>
-              <div className="flex gap-3 sm:gap-4">
-                <div className="bg-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl border border-slate-100 shadow-sm min-w-[120px] sm:min-w-[140px]">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                    Completed
-                  </p>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                      24
-                    </span>
-                    <span className="text-[10px] text-green-500 font-bold">
-                      +12%
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl border border-slate-100 shadow-sm min-w-[120px] sm:min-w-[140px]">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                    Upcoming
-                  </p>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                      08
-                    </span>
-                    <span className="text-[10px] text-indigo-600 font-bold">
-                      Next 48h
-                    </span>
-                  </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {summary?.completed ?? 0}
+                  </span>
+                  <span className="text-[10px] text-green-500 font-bold">
+                    / {summary?.total ?? 0}
+                  </span>
                 </div>
               </div>
-            </section>
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
-              <div className="xl:col-span-8 space-y-6 lg:space-y-8">
-                <section>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-indigo-600 text-[18px]">
-                      <Star />
-                    </span>
-                    <h2 className="text-sm font-bold text-slate-900">
-                      Quick Access
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-3 sm:gap-4">
-                    {[
-                      {
-                        icon: <Folder />,
-                        color: "bg-blue-50 text-blue-600",
-                        title: "Product Launch",
-                        sub: "Marketing Space",
-                      },
-                      {
-                        icon: <Blend />,
-                        color: "bg-purple-50 text-purple-600",
-                        title: "Design System",
-                        sub: "UX Design Team",
-                      },
-                      {
-                        icon: <FileText />,
-                        color: "bg-orange-50 text-orange-600",
-                        title: "Q3 Roadmap",
-                        sub: "Strategy Docs",
-                      },
-                    ].map(({ icon, color, title, sub }) => (
-                      <div
-                        key={title}
-                        className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group"
-                      >
-                        <div
-                          className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${color}`}
-                        >
-                          <span className="material-symbols-outlined text-[20px]">
-                            {icon}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                          {title}
-                        </h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {sub}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Today's Agenda */}
-                <section className="bg-white p-5 sm:p-6 rounded-xl border border-slate-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-indigo-600 text-[18px]">
-                        <CalendarCheck />
-                      </span>
-                      <h2 className="text-sm font-bold text-slate-900">
-                        Today's Agenda
-                      </h2>
-                    </div>
-                    <button className="text-indigo-600 text-[11px] font-bold hover:underline flex items-center gap-1">
-                      View Calendar
-                      <span className="material-symbols-outlined text-[14px]">
-                        <ArrowRight />
-                      </span>
-                    </button>
-                  </div>
-                  <div className="space-y-0">
-                    {[
-                      {
-                        dot: "bg-indigo-600 ring-indigo-100",
-                        title: "Daily Standup",
-                        time: "09:30 AM",
-                        sub: "Core Infrastructure Team",
-                        badge: null,
-                        showAvatars: true,
-                      },
-                      {
-                        dot: "bg-pink-400 ring-pink-100",
-                        title: "Design Review: Lumina Dashboard",
-                        time: "11:00 AM",
-                        sub: "Reviewing theme components",
-                        badge: "Priority",
-                        showAvatars: false,
-                      },
-                      {
-                        dot: "bg-slate-300",
-                        title: "Content Strategy Workshop",
-                        time: "02:00 PM",
-                        sub: "Defining editorial voice for Q4",
-                        badge: null,
-                        showAvatars: false,
-                      },
-                    ].map(
-                      (
-                        { dot, title, time, sub, badge, showAvatars },
-                        i,
-                        arr,
-                      ) => (
-                        <div key={title} className="flex gap-3 sm:gap-4">
-                          <div className="flex flex-col items-center pt-1.5 flex-shrink-0">
-                            <div
-                              className={`w-2.5 h-2.5 rounded-full ring-4 flex-shrink-0 ${dot}`}
-                            />
-                            {i < arr.length - 1 && (
-                              <div
-                                className="w-px flex-1 bg-slate-100 my-1"
-                                style={{ minHeight: 40 }}
-                              />
-                            )}
-                          </div>
-                          <div
-                            className={`flex-1 pb-5 ${
-                              i < arr.length - 1
-                                ? "border-b border-slate-50"
-                                : ""
-                            }`}
-                          >
-                            <div className="flex flex-wrap justify-between items-start gap-1 mb-0.5">
-                              <h4 className="text-sm font-bold text-slate-900 pr-2">
-                                {title}
-                              </h4>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase flex-shrink-0">
-                                {time}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-[12px] text-slate-500">
-                                {sub}
-                              </p>
-                              {badge && (
-                                <span className="bg-pink-50 text-pink-500 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tight flex-shrink-0">
-                                  {badge}
-                                </span>
-                              )}
-                            </div>
-                            {showAvatars && (
-                              <div className="flex -space-x-2 mt-2.5">
-                                <img
-                                  alt="user"
-                                  className="w-6 h-6 rounded-full border-2 border-white object-cover"
-                                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcylbjkB530VBN53zzarSaGvW85H8dM0We8JcY-mzr-0r6PCt0Fd7k_sSdpvX6enSjuwuaNQwiqFp2uf91usLD4XU84jXEylWqgClZraVCvy9FwHvi4VjW4aHDJSTMI-qTG-Vb9Szu16i10Hw7BDBUFziVebJz1bJ4666d3FWgUwcza3HiXWNkzG91oVhIumJErfU-xDQA_dWaZFYQfz21tad4x1xPj5nfJJcK8_dSQE-OA3ci4YM-pUJkE5tDk47b84OmNji_KTs"
-                                />
-                                <img
-                                  alt="user"
-                                  className="w-6 h-6 rounded-full border-2 border-white object-cover"
-                                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2mWghlfsJpPVYOrAvAPa7xE4pkwbEHoeS3LtfZYrOvaOwyC1B-D-n2CpyDI31WZb3U-g8BUC0moISNVjoWzPKdwDjqbrIgU27TUckMWFCwgtsS4HmqylxccZgEQemEAxgMktHP_G2pO88FXPsQ4SnC2h6VL9Km79QQ45Amh7MM5kVaUtPYzglMggIORaXnDR1XBdXqE7nBAIlN4psLCCM3J9B-bRqlaeof_pzRJ7nvsmoiKtvKgZSLSvcyip4hXPZEMzwo8jrw4I"
-                                />
-                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-bold border-2 border-white text-slate-500">
-                                  +3
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </section>
-              </div>
-
-              <div className="xl:col-span-4 space-y-6 lg:space-y-8">
-                <section className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-sm font-bold text-slate-900">
-                      Space Progress
-                    </h2>
-                    <span className="material-symbols-outlined text-slate-300 text-[18px] cursor-pointer hover:text-slate-500 transition-colors">
-                      <Ellipsis />
-                    </span>
-                  </div>
-                  <div className="space-y-4">
-                    {[
-                      { label: "Marketing", pct: 82, opacity: "opacity-100" },
-                      { label: "Development", pct: 45, opacity: "opacity-60" },
-                      { label: "Operations", pct: 91, opacity: "opacity-80" },
-                    ].map(({ label, pct, opacity }) => (
-                      <div key={label}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-[12px] font-bold text-slate-700">
-                            {label}
-                          </span>
-                          <span className="text-[12px] font-bold text-indigo-600">
-                            {pct}%
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                          <div
-                            className={`bg-indigo-600 h-full rounded-full transition-all ${opacity}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="w-full mt-5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-[11px] rounded-lg transition-all">
-                    Manage All Spaces
-                  </button>
-                </section>
-
-                <div className="grid grid-cols-2 xl:grid-cols-1 gap-3 xl:gap-4">
-                  {[
-                    {
-                      icon: <Gauge />,
-                      title: "Team Velocity",
-                      value: "12.5",
-                      unit: "tasks/day",
-                      trend: {
-                        icon: "trending_up",
-                        label: "14% improvement",
-                        color: "text-green-500",
-                      },
-                    },
-                    {
-                      icon: <AlarmClockCheck />,
-                      title: "Time Saved",
-                      value: "4.2",
-                      unit: "hrs/week",
-                      trend: {
-                        icon: "horizontal_rule",
-                        label: "Consistent",
-                        color: "text-slate-400",
-                      },
-                    },
-                  ].map(({ icon, title, value, unit, trend }) => (
-                    <div
-                      key={title}
-                      className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"
-                    >
-                      <div className="flex items-center gap-2.5 mb-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
-                          <span className="material-symbols-outlined text-[18px]">
-                            {icon}
-                          </span>
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-900">
-                          {title}
-                        </h4>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-bold text-slate-900">
-                          {value}
-                        </span>
-                        <span className="text-[10px] font-medium text-slate-400">
-                          {unit}
-                        </span>
-                      </div>
-                      <div
-                        className={`flex items-center gap-1 text-[10px] font-bold mt-1 ${trend.color}`}
-                      >
-                        <span className="material-symbols-outlined text-[12px]">
-                          {trend.icon}
-                        </span>
-                        {trend.label}
-                      </div>
-                    </div>
-                  ))}
+              <div className="bg-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl border border-slate-100 shadow-sm min-w-[120px] sm:min-w-[140px]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                  Upcoming
+                </p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {String(summary?.upcoming ?? 0).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] text-indigo-600 font-bold">
+                    Next 48h
+                  </span>
                 </div>
-
-                <section className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 sm:p-6">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-                  <div className="relative z-10">
-                    <span className="inline-block text-[9px] font-bold uppercase tracking-widest opacity-70 mb-2 bg-white/10 px-2 py-0.5 rounded-full">
-                      Premium Feature
-                    </span>
-                    <h3 className="text-base sm:text-lg font-bold mb-1 leading-snug">
-                      Master your workflow with Velocity Pro.
-                    </h3>
-                    <p className="text-[11px] text-indigo-200 mb-4">
-                      Unlock AI-powered automation and advanced analytics.
-                    </p>
-                    <button className="bg-white text-indigo-700 px-4 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm">
-                      Upgrade Now →
-                    </button>
-                  </div>
-                </section>
               </div>
             </div>
+          </section>
 
-            <section className="mt-8 lg:mt-12">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Recently Modified
-                </h2>
-                <button className="text-indigo-600 text-[11px] font-bold hover:underline">
-                  See all
-                </button>
+          {isEmpty ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
+                <Inbox className="w-8 h-8 text-indigo-300" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                {/* Featured Item */}
-                <div className="sm:col-span-2 bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group">
-                  <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-50 transition-colors">
-                    <span className="material-symbols-outlined text-slate-400 text-2xl group-hover:text-indigo-500 transition-colors">
-                      <FileText />
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                      Annual Budget.pdf
-                    </h4>
-                    <p className="text-[10px] text-slate-400 mb-1.5">
-                      Edited 24 mins ago
-                    </p>
-                    <div className="flex gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-50 text-[8px] font-bold text-slate-500 uppercase tracking-tight border border-slate-100">
-                        Finance
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-slate-50 text-[8px] font-bold text-slate-500 uppercase tracking-tight border border-slate-100">
-                        Shared
-                      </span>
-                    </div>
-                  </div>
+              <h2 className="text-lg font-bold text-slate-700 mb-2">
+                Chưa có dữ liệu nào
+              </h2>
+              <p className="text-sm text-slate-400 max-w-xs">
+                Bạn chưa được thêm vào space nào hoặc chưa có task được giao. Hãy liên hệ admin workspace.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+                <div className="xl:col-span-8 space-y-6 lg:space-y-8">
+                  <QuickAccess spaces={spaces} />
+                  <TaskList
+                    todayTasks={todayTasks}
+                    allTasks={tasks}
+                    dueToday={summary?.dueToday}
+                    workspaces={workspaces}
+                    spaces={spaces}
+                  />
                 </div>
-
-                {[
-                  {
-                    icon: <FileText />,
-                    iconColor: "text-orange-400",
-                    title: "Sprint Planning v2",
-                    date: "Yesterday at 4:12 PM",
-                  },
-                  {
-                    icon: <SquarePlay />,
-                    iconColor: "text-blue-400",
-                    title: "Board Deck Final",
-                    date: "Aug 24, 2023",
-                  },
-                ].map(({ icon, iconColor, title, date }) => (
-                  <div
-                    key={title}
-                    className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <span
-                        className={`material-symbols-outlined text-[18px] ${iconColor}`}
-                      >
-                        {icon}
-                      </span>
-                      <span className="material-symbols-outlined text-slate-300 text-[16px] cursor-pointer hover:text-slate-500 transition-colors">
-                        more_horiz
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900 truncate group-hover:text-indigo-700 transition-colors">
-                      {title}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{date}</p>
-                  </div>
-                ))}
+                <div className="xl:col-span-4 space-y-4">
+                  <StatsPanel
+                    summary={summary}
+                    tasks={tasks}
+                    activities={activities
+                      .sort(
+                        (a, b) =>
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime(),
+                      )
+                      .slice(0, 5)}
+                  />
+                </div>
               </div>
-            </section>
 
-            <div className="h-8" />
-          </div>
+              {attachments.length > 0 && (
+                <section className="mt-12">
+                  <h2 className="text-sm font-bold text-slate-900 mb-4">
+                    Recently Modified
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                    {attachments.slice(0, 6).map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="col-span-1 md:col-span-2 bg-white p-4 rounded-lg border border-slate-100 shadow-sm flex items-center gap-4"
+                      >
+                        <div className="w-12 h-12 bg-slate-50 rounded-lg flex items-center justify-center">
+                          <FileText className="text-slate-400 w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-bold text-slate-900">
+                            {attachment.fileName}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mb-1.5">
+                            {attachment.createdAt}
+                          </p>
+                          <span className="text-[12px] text-slate-500">
+                            {attachment.task.name} ·{" "}
+                            {attachment.task.list.name} ·{" "}
+                            {attachment.task.list.category.space.name}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
+          <div className="h-8" />
         </div>
-
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-          rel="stylesheet"
-        />
       </div>
-    );
-  }
+    </div>
+  );
 };
 
 export default Home;

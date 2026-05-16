@@ -1,13 +1,46 @@
 import { Service } from "typedi";
-import { Attachment, User } from "../models";
+import { Attachment, Category, List, Space, Task, User } from "../models";
 import { CreateAttachmentInput } from "../types/attachment";
 
 @Service()
 export class AttachmentRepository {
-  async findByTaskId(taskId: number) {
+  async findByTaskId(taskId?: number) {
+    const whereClause = taskId !== undefined ? { taskId } : {};
     return await Attachment.findAll({
-      where: { taskId },
-      include: [{ model: User, as: "uploader", attributes: ["id", "fullName", "email", "avatar"] }],
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: "uploader",
+          attributes: ["id", "fullName", "email", "avatar"],
+        },
+        {
+          model: Task,
+          as: "task",
+          attributes: ["id", "name"],
+          include: [
+            {
+              model: List,
+              as: "list",
+              attributes: ["id", "name"],
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                  attributes: ["id", "name"],
+                  include: [
+                    {
+                      model: Space,
+                      as: "space",
+                      attributes: ["id", "name"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
       order: [["createdAt", "ASC"]],
     });
   }

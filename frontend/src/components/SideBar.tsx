@@ -47,7 +47,7 @@ import { CreateListFormData } from "../validations/list";
 import { callCreateList } from "../services/list";
 import CreateCategoryModal from "./categories/CreateCategoryModal";
 import CreateListModal from "./lists/CreateListModal";
-import { Icon } from "./ui/Icon";
+import { callGetMembers } from "../services/workspace";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Rocket,
@@ -117,7 +117,7 @@ const SideBar: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { workspaceId } = useParams();
-
+  const [members, setMembers] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -153,7 +153,19 @@ const SideBar: React.FC = () => {
   const isActive = (path: string) => {
     if (!workspaceId) return false;
     if (path === "/") return pathname === `/${workspaceId}`;
-    return pathname.startsWith(`/${workspaceId}${path}`);
+    return (
+      pathname.startsWith(`/${workspaceId}${path}/`) ||
+      pathname === `/${workspaceId}${path}`
+    );
+  };
+
+  const fetchMember = async () => {
+    try {
+      const res = await callGetMembers(Number(workspaceId));
+      setMembers(res.data);
+    } catch (error: any) {
+      toastError(error.message);
+    }
   };
 
   const fetchSpaces = async () => {
@@ -167,6 +179,10 @@ const SideBar: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchMember();
+  }, [workspaceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,10 +233,12 @@ const SideBar: React.FC = () => {
   };
 
   const isSpacePath = (spaceId: number) =>
-    pathname.includes(`/${workspaceId}/spaces/${spaceId}`);
+    pathname.startsWith(`/${workspaceId}/spaces/${spaceId}/`) ||
+    pathname === `/${workspaceId}/spaces/${spaceId}`;
 
   const isCategoryPath = (spaceId: number, catId: number) =>
-    pathname.includes(`/${workspaceId}/spaces/${spaceId}/${catId}`);
+    pathname.startsWith(`/${workspaceId}/spaces/${spaceId}/${catId}/`) ||
+    pathname === `/${workspaceId}/spaces/${spaceId}/${catId}`;
 
   const isListPath = (spaceId: number, catId: number, listId: number) =>
     pathname === `/${workspaceId}/spaces/${spaceId}/${catId}/${listId}`;
@@ -269,13 +287,15 @@ const SideBar: React.FC = () => {
 
   useEffect(() => {
     spaces.forEach((space, spaceIdx) => {
-      if (isSpacePath(space.id)) {
+      if (pathname.includes(`/${workspaceId}/spaces/${space.id}`)) {
         setOpenSpacesList((prev) =>
           prev.includes(spaceIdx) ? prev : [...prev, spaceIdx],
         );
 
         space.categories.forEach((cat, catIdx) => {
-          if (isCategoryPath(space.id, cat.id)) {
+          if (
+            pathname.includes(`/${workspaceId}/spaces/${space.id}/${cat.id}`)
+          ) {
             const key = `${spaceIdx}-${catIdx}`;
             setOpenCategories((prev) =>
               prev.includes(key) ? prev : [...prev, key],
@@ -284,7 +304,7 @@ const SideBar: React.FC = () => {
         });
       }
     });
-  }, [pathname]);
+  }, [pathname, spaces]);
 
   const renderSpacesTree = () => (
     <div className="ml-1 mt-0.5 space-y-0.5">
@@ -567,7 +587,7 @@ const SideBar: React.FC = () => {
                     {workspace?.name}
                   </p>
                   <p className="text-[10.5px] text-slate-400">
-                    {userWorkspaces.length} workspaces
+                    {members?.users.length || 0} members
                   </p>
                 </div>
               </div>
