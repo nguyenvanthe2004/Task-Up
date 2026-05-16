@@ -64,9 +64,7 @@ const Home: React.FC = () => {
 
         const userSpaces = allSpaces.filter((sp: any) => {
           if (Array.isArray(sp.members)) {
-            return sp.members.some(
-              (m: any) => (m.userId ?? m.id) === user.id
-            );
+            return sp.members.some((m: any) => (m.userId ?? m.id) === user.id);
           }
           return true;
         });
@@ -83,7 +81,7 @@ const Home: React.FC = () => {
                 const spaceId = (t.list as any)?.category?.space?.id;
                 return spaceId !== undefined && spaceIds.has(spaceId);
               })
-            : allTasks; 
+            : allTasks;
         setTasks(userTasks);
 
         if (summaryRes.status === "fulfilled") {
@@ -101,7 +99,14 @@ const Home: React.FC = () => {
             return diff > 0 && diff <= 48 * 60 * 60 * 1000;
           }).length;
           const dueToday = userTasks.filter((t) => isToday(t.dueDate)).length;
-          setSummary({ ...raw, completed, total, highPriority, upcoming, dueToday });
+          setSummary({
+            ...raw,
+            completed,
+            total,
+            highPriority,
+            upcoming,
+            dueToday,
+          });
         } else {
           setSummary(null);
         }
@@ -110,8 +115,7 @@ const Home: React.FC = () => {
           const allAc: Activity[] = actRes.value.data;
           const userActivities = allAc.filter((a) => {
             const isOwner =
-              (a as any).userId === user.id ||
-              (a as any).user?.id === user.id;
+              (a as any).userId === user.id || (a as any).user?.id === user.id;
             const spaceId = a.task?.list?.category?.space?.id;
             const inUserSpace =
               spaceIds.size > 0
@@ -176,14 +180,14 @@ const Home: React.FC = () => {
               </h1>
               <p className="text-slate-500 text-sm">
                 {isEmpty ? (
-                  "Bạn chưa có dữ liệu nào trong workspace này."
+                  "This workspace has no data yet."
                 ) : (
                   <>
-                    Bạn có{" "}
+                    You have{" "}
                     <span className="text-indigo-600 font-semibold">
-                      {summary?.highPriority ?? 0} task ưu tiên cao
+                      {summary?.highPriority ?? 0} high-priority tasks
                     </span>{" "}
-                    được giao cho bạn.
+                    assigned to you.
                   </>
                 )}
               </p>
@@ -227,7 +231,8 @@ const Home: React.FC = () => {
                 Chưa có dữ liệu nào
               </h2>
               <p className="text-sm text-slate-400 max-w-xs">
-                Bạn chưa được thêm vào space nào hoặc chưa có task được giao. Hãy liên hệ admin workspace.
+                Bạn chưa được thêm vào space nào hoặc chưa có task được giao.
+                Hãy liên hệ admin workspace.
               </p>
             </div>
           ) : (
@@ -280,9 +285,8 @@ const Home: React.FC = () => {
                             {attachment.createdAt}
                           </p>
                           <span className="text-[12px] text-slate-500">
-                            {attachment.task.name} ·{" "}
-                            {attachment.task.list.name} ·{" "}
-                            {attachment.task.list.category.space.name}
+                            {attachment.task.name} · {attachment.task.list.name}{" "}
+                            · {attachment.task.list.category.space.name}
                           </span>
                         </div>
                       </div>
