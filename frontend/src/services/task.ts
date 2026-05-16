@@ -17,6 +17,10 @@ export const callGetTaskByUser = async (userId: number, statusId?: number) => {
     },
   });
 };
+
+export const callGetTaskSummary = async () => {
+  return await instance.get("/tasks/summary");
+};
 export const callGetTaskById = async (id: number) => {
   return await instance.get(`/tasks/${id}`);
 };

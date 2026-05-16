@@ -22,6 +22,14 @@ interface Member {
   email: string;
   avatar?: string;
 }
+
+export interface TaskSummary {
+  total: number;
+  completed: number;
+  upcoming: number;
+  highPriority: number;
+  dueToday: number;
+}
 export interface CreateTask {
   name: string;
   description: string;

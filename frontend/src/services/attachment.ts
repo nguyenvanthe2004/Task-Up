@@ -1,6 +1,6 @@
 import instance from "./req";
 
-export const callGetAttachments = async (taskId: number) => {
+export const callGetAttachments = async (taskId?: number) => {
   return await instance.get("/attachments", { params: { taskId } });
 };
 

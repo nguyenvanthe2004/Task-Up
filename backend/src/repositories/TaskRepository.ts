@@ -168,4 +168,42 @@ export class TaskRepository {
   async countBySpace(listId: number) {
     return await Task.count({ where: { listId } });
   }
+
+  async findSummaryByUser(userId: number) {
+    const now = new Date();
+    const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const userTaskIds = literal(`(SELECT taskId FROM task_assignees WHERE userId = ${userId})`);
+
+    const completedIds = literal(
+      `(SELECT t.id FROM tasks t INNER JOIN statuses s ON t.statusId = s.id WHERE (LOWER(s.name) LIKE '%done%' OR LOWER(s.name) LIKE '%complete%' OR LOWER(s.name) LIKE '%closed%') AND t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId}))`
+    );
+
+    const [total, completed, upcoming, highPriority, dueToday] = await Promise.all([
+      Task.count({ where: { id: { [Op.in]: userTaskIds } } }),
+      Task.count({ where: { id: { [Op.in]: completedIds } } }),
+      Task.count({
+        where: {
+          id: { [Op.in]: userTaskIds },
+          dueDate: { [Op.between]: [now, in48h] },
+        },
+      }),
+      Task.count({
+        where: {
+          id: { [Op.in]: userTaskIds },
+          priority: { [Op.in]: ["high", "urgent"] },
+        },
+      }),
+      Task.count({
+        where: {
+          id: { [Op.in]: userTaskIds },
+          dueDate: { [Op.between]: [todayStart, todayEnd] },
+        },
+      }),
+    ]);
+
+    return { total, completed, upcoming, highPriority, dueToday };
+  }
 }

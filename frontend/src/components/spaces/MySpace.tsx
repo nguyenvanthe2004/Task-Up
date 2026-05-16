@@ -77,6 +77,7 @@ const MySpace: React.FC = () => {
     setLoading(true);
     try {
       const res = await callGetSpaces(Number(workspaceId));
+      console.log(res.data);
       setSpaces(res.data);
     } catch (err: any) {
       toastError(err.message ?? "Failed to load spaces.");
@@ -190,9 +191,7 @@ const MySpace: React.FC = () => {
     return (
       <div
         key={space.id}
-        className={`relative bg-surface-container-lowest border border-outline-variant rounded-lg p-6 flex flex-col hover:border-primary transition-colors group ${
-          wide ? "lg:col-span-2" : ""
-        }`}
+        className={`relative bg-surface-container-lowest border border-outline-variant rounded-lg p-6 flex flex-col hover:border-primary transition-colors group `}
       >
         {/* Action buttons — visible on hover */}
         <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -202,7 +201,7 @@ const MySpace: React.FC = () => {
         <div className="flex justify-between items-start mb-6">
           {/* Icon container — uses space.color if available */}
           <div
-            className={`${wide ? "w-16 h-16" : "w-12 h-12"} flex-shrink-0 rounded-lg flex items-center justify-center`}
+            className={`w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center`}
             style={{
               backgroundColor: space.color ? `${space.color}18` : undefined,
               color: space.color ?? undefined,
@@ -210,7 +209,7 @@ const MySpace: React.FC = () => {
           >
             <SpaceIcon
               icon={space.icon}
-              className={wide ? "w-8 h-8" : "w-6 h-6"}
+              className={"w-6 h-6"}
             />
           </div>
           {space.workspaceId?.name && (
@@ -221,7 +220,7 @@ const MySpace: React.FC = () => {
         </div>
 
         <h3
-          className={`${wide ? "text-xl" : "text-lg"} font-bold text-on-surface mb-1`}
+          className={`text-lg font-bold text-on-surface mb-1`}
         >
           {space.name}
         </h3>
@@ -244,7 +243,7 @@ const MySpace: React.FC = () => {
             }
             className="text-primary text-sm font-bold hover:underline"
           >
-            {wide ? "Manage Space" : "Manage"}
+            {"Manage"}
           </button>
         </div>
       </div>
@@ -305,13 +304,7 @@ const MySpace: React.FC = () => {
               </p>
             </div>
           )}
-          {!loading && spaces.length > 0 && (
-            <>
-              {spaces.slice(0, 3).map((s) => renderCard(s))}
-              {spaces[3] && renderCard(spaces[3], true)}
-              {spaces.slice(4).map((s) => renderCard(s))}
-            </>
-          )}
+          {!loading && spaces.map((s) => renderCard(s))}
           {!loading && (
             <div
               onClick={open}
@@ -409,7 +402,7 @@ const MySpace: React.FC = () => {
                         </span>
                       </p>
                       <span className="flex items-center gap-1 space-y-4 text-[10px] text-on-surface-variant">
-                        <User size={12}/>{" "}
+                        <User size={12} />{" "}
                         {space.workspace?.userWorkspaces?.find(
                           (uw: UserWorkspace) => uw.invitedBy !== null,
                         )?.inviter?.fullName ?? ""}

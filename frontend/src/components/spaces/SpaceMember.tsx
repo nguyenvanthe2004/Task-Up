@@ -23,7 +23,6 @@ const SpaceMember: React.FC = () => {
   const fetchSpaceById = async () => {
     try {
       const res = await callGetSpaceById(Number(spaceId));
-      console.log(res.data);
       setSpace(res.data);
     } catch (error: any) {
       toastError(error.message);

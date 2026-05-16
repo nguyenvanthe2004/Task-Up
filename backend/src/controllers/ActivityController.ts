@@ -17,6 +17,11 @@ export class ActivityController {
     return await this.activityService.findAll(taskId);
   }
 
+  @Get("/recent")
+  async getRecent(@CurrentUser() user: UserProps) {
+    return await this.activityService.getRecent(user);
+  }
+
   @Get("/:id")
   async findById(@Param("id") id: number) {
     return await this.activityService.findById(id);

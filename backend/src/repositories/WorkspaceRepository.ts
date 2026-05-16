@@ -25,7 +25,14 @@ export class WorkspaceRepository {
     return await Workspace.findAll({
       offset: skip,
       limit,
-      raw: true,
+      include: [
+        {
+          model: User,
+          as: "users",
+          attributes: ["id", "fullName", "email", "avatar"],
+          through: { attributes: [] },
+        },
+      ],
     });
   }
 
@@ -38,30 +45,30 @@ export class WorkspaceRepository {
   }
 
   async findMembers(workspaceId: number) {
-  return await Workspace.findByPk(workspaceId, {
-    include: [
-      {
-        model: User,
-        as: "users",
-        attributes: ["id", "fullName", "email", "avatar"],
-        through: {
-          attributes: ["role", "invitedBy", "acceptedAt"],
-        },
-      },
-      {
-        model: UserWorkspace,
-        as: "userWorkspaces",
-        include: [
-          {
-            model: User,
-            as: "inviter",
-            attributes: ["id", "email"],
+    return await Workspace.findByPk(workspaceId, {
+      include: [
+        {
+          model: User,
+          as: "users",
+          attributes: ["id", "fullName", "email", "avatar"],
+          through: {
+            attributes: ["role", "invitedBy", "acceptedAt"],
           },
-        ],
-      },
-    ],
-  });
-}
+        },
+        {
+          model: UserWorkspace,
+          as: "userWorkspaces",
+          include: [
+            {
+              model: User,
+              as: "inviter",
+              attributes: ["id", "email"],
+            },
+          ],
+        },
+      ],
+    });
+  }
 
   async findByUser(userId: number) {
     return await Workspace.findAll({

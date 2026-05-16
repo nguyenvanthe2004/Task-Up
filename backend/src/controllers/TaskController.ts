@@ -37,6 +37,11 @@ export class TaskController {
     return await this.taskService.findByUser(user, statusId);
   }
 
+  @Get("/summary")
+  async getSummary(@CurrentUser() user: UserProps) {
+    return await this.taskService.getSummary(user);
+  }
+
   @Get("/:id")
   async findById(@Param("id") id: number) {
     return await this.taskService.findById(id);
