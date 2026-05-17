@@ -2,7 +2,6 @@ import { Service } from "typedi";
 import { Status } from "../models";
 import { CreateStatus, UpdateStatus } from "../types/status";
 
-
 @Service()
 export class StatusRepository {
   async findById(id: number) {
@@ -11,7 +10,7 @@ export class StatusRepository {
 
   async findAll() {
     return await Status.findAll({
-      order: [["createdAt", "ASC"]],
+      order: [["position", "ASC"]],
     });
   }
 

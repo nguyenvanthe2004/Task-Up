@@ -12,6 +12,10 @@ export interface Activity {
         space: {
           id: number;
           name: string;
+          workspace: {
+            id: number;
+            name: string;
+          }
         };
       };
     };
