@@ -1,5 +1,5 @@
 import { Service } from "typedi";
-import { Category, List, Space, Task, User } from "../models";
+import { Category, List, Space, Task, User, Workspace } from "../models";
 import Activity from "../models/Activity";
 import { CreateActivityInput, UpdateActivityInput } from "../types/activityLog";
 
@@ -34,6 +34,13 @@ export class ActivityRepository {
                       model: Space,
                       as: "space",
                       attributes: ["id", "name"],
+                      include: [
+                        {
+                          model: Workspace,
+                          as: "workspace",
+                          attributes: ["id", "name", "ownerId"],
+                        },
+                      ],
                     },
                   ],
                 },

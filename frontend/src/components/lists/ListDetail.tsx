@@ -21,6 +21,7 @@ import { exportCSV, exportExcel, exportJSON } from "../../lib/export";
 import { callCreateTask } from "../../services/task";
 import { importFile } from "../../lib/import";
 import { PriorityStatus } from "../../constants";
+import StatusManager from "./StattusManager";
 
 type ListViewType = "list" | "kanban" | "calendar";
 
@@ -335,6 +336,7 @@ const ListDetail: React.FC = () => {
                 </div>
               )}
             </div>
+            <StatusManager spaceId={Number(spaceId)} />
           </div>
         </div>
 

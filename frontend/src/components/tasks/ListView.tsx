@@ -88,6 +88,8 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
     }
   }, [listId, spaceId]);
 
+  console.log(statuses)
+
   useImperativeHandle(ref, () => ({
     refresh: fetchData,
     getTasks: () => groups.flatMap((g) => g.tasks),

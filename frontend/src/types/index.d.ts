@@ -21,3 +21,17 @@ export interface PaginationProps {
   totalPages: number;
   onPageChange?: (page: number) => void;
 }
+
+export type NavId = "profile" | "notifications" | "security" | "integrations";
+export type WorkspaceId = "overview" | "members" | "billing";
+export type IntegrationKey = "google" | "github";
+
+export interface NavItem {
+  id: NavId;
+  label: string;
+}
+
+export interface WorkspaceItem {
+  id: WorkspaceId;
+  label: string;
+}

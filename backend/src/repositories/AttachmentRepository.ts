@@ -1,5 +1,5 @@
 import { Service } from "typedi";
-import { Attachment, Category, List, Space, Task, User } from "../models";
+import { Attachment, Category, List, Space, Task, User, Workspace } from "../models";
 import { CreateAttachmentInput } from "../types/attachment";
 
 @Service()
@@ -33,6 +33,13 @@ export class AttachmentRepository {
                       model: Space,
                       as: "space",
                       attributes: ["id", "name"],
+                      include: [
+                        {
+                          model: Workspace,
+                          as: "workspace",
+                          attributes: ["id", "name", "ownerId"],
+                        },
+                      ],
                     },
                   ],
                 },

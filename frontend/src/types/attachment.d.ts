@@ -14,6 +14,10 @@ export interface Attachment {
         space: {
           id: number;
           name: string;
+          workspace: {
+            id: number;
+            name: string;
+          }
         };
       };
     };

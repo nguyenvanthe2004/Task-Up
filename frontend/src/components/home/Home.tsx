@@ -69,7 +69,7 @@ const Home: React.FC = () => {
           return true;
         });
 
-        const spaceIds: Set<number> = new Set(userSpaces.map((sp) => sp.id));
+        const spaceIds = new Set(userSpaces.map((sp) => sp.id));
         setSpaces(userSpaces);
 
         const allTasks: Task[] =
@@ -78,17 +78,29 @@ const Home: React.FC = () => {
         const userTasks =
           spaceIds.size > 0
             ? allTasks.filter((t) => {
-                const spaceId = (t.list as any)?.category?.space?.id;
+                const spaceId = (t as any).list?.category?.space?.id;
                 return spaceId !== undefined && spaceIds.has(spaceId);
               })
-            : allTasks;
+            : [];
         setTasks(userTasks);
 
         if (summaryRes.status === "fulfilled") {
           const raw = summaryRes.value.data as TaskSummary;
-          const completed = userTasks.filter(
-            (t) => (t.status as any)?.name?.toLowerCase() === "done",
-          ).length;
+
+          const DONE_KEYWORDS = [
+            "done",
+            "complete",
+            "completed",
+            "closed",
+            "finish",
+            "finished",
+          ];
+          const isDone = (t: Task) => {
+            const name = (t.status as any)?.name?.toLowerCase() ?? "";
+            return DONE_KEYWORDS.some((kw) => name.includes(kw));
+          };
+
+          const completed = userTasks.filter(isDone).length;
           const total = userTasks.length;
           const highPriority = userTasks.filter(
             (t) => t.priority === "high" || t.priority === "urgent",
@@ -99,6 +111,7 @@ const Home: React.FC = () => {
             return diff > 0 && diff <= 48 * 60 * 60 * 1000;
           }).length;
           const dueToday = userTasks.filter((t) => isToday(t.dueDate)).length;
+
           setSummary({
             ...raw,
             completed,
@@ -116,12 +129,9 @@ const Home: React.FC = () => {
           const userActivities = allAc.filter((a) => {
             const isOwner =
               (a as any).userId === user.id || (a as any).user?.id === user.id;
-            const spaceId = a.task?.list?.category?.space?.id;
-            const inUserSpace =
-              spaceIds.size > 0
-                ? spaceId !== undefined && spaceIds.has(spaceId)
-                : true;
-            return isOwner && inUserSpace;
+            const wsId = a.task?.list?.category?.space?.workspace?.id;
+            const inWorkspace = String(wsId) === String(workspaceId);
+            return isOwner && inWorkspace;
           });
           setActivities(userActivities);
         } else {
@@ -130,9 +140,13 @@ const Home: React.FC = () => {
 
         if (atmRes.status === "fulfilled") {
           const allAtm: Attachment[] = atmRes.value.data;
-          const userTaskIds = new Set(userTasks.map((t) => t.id));
           const userAttachments = allAtm.filter((a) => {
-            return userTaskIds.has(a.taskId);
+            const isUploader =
+              (a as any).uploadedBy === user.id ||
+              (a as any).uploader?.id === user.id;
+            const wsId = (a as any).task?.list?.category?.space?.workspace?.id;
+            const inWorkspace = String(wsId) === String(workspaceId);
+            return isUploader && inWorkspace;
           });
           setAttachments(userAttachments);
         } else {
@@ -228,11 +242,11 @@ const Home: React.FC = () => {
                 <Inbox className="w-8 h-8 text-indigo-300" />
               </div>
               <h2 className="text-lg font-bold text-slate-700 mb-2">
-                Chưa có dữ liệu nào
+                This workspace is empty
               </h2>
               <p className="text-sm text-slate-400 max-w-xs">
-                Bạn chưa được thêm vào space nào hoặc chưa có task được giao.
-                Hãy liên hệ admin workspace.
+                You haven't been added to any spaces or have any tasks assigned.
+                Please contact your workspace admin.
               </p>
             </div>
           ) : (

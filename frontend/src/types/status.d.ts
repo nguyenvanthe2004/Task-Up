@@ -2,6 +2,7 @@ export interface CreateStatus {
   name: string;
   color: string;
   position: number;
+  spaceId: number;
 }
 
 export interface UpdateStatus {
@@ -15,4 +16,5 @@ export interface Status {
   name: string;
   color: string;
   position: number;
+  isDone?: boolean;
 }
