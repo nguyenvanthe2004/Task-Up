@@ -27,7 +27,7 @@ export class UserRepository {
       include: [
         {
           model: Workspace,
-          attributes: ["id", "name", "icon", "color", "description"],
+          attributes: ["id", "name", "icon", "color", "description", "ownerId"],
           through: { attributes: [] },
           as: "workspaces",
         },

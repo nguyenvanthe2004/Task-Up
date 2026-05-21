@@ -9,6 +9,8 @@ const TaskCard: React.FC<{
   task: Task;
   isDone: boolean;
   isChecked: boolean;
+  isPrivate?: boolean;
+  canView?: boolean;
   statuses: Status[];
   members: Member[];
   onSelect: (task: Task) => void;
@@ -19,6 +21,8 @@ const TaskCard: React.FC<{
   task,
   isDone,
   isChecked,
+  isPrivate = false,
+  canView = true,
   statuses,
   members,
   onSelect,
@@ -70,79 +74,36 @@ const TaskCard: React.FC<{
             </span>
           )}
         </div>
-
-        <div className="relative flex-none">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen((v) => !v);
-            }}
-            className="p-1 rounded-md text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-stone-50 hover:text-stone-500 transition-all"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <circle cx="10" cy="4" r="1.5" />
-              <circle cx="10" cy="10" r="1.5" />
-              <circle cx="10" cy="16" r="1.5" />
-            </svg>
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-6 z-20 bg-white shadow-xl border border-stone-100 rounded-xl py-1 w-36 text-xs">
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium flex items-center gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect(task);
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="material-symbols-outlined text-[14px]">
-                  open_in_new
-                </span>
-                View detail
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-indigo-600 font-medium flex items-center gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(task.id);
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="material-symbols-outlined text-[14px]">
-                  edit
-                </span>
-                Edit
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(task.id);
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="material-symbols-outlined text-[14px]">
-                  delete
-                </span>
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
       </div>
-
-      <p
+      {/* Task name + lock icon */}
+      <div
         onClick={() => onSelect(task)}
-        className={`text-sm font-semibold leading-snug mb-3 cursor-pointer hover:text-indigo-600 transition-colors ${
-          isDone ? "line-through text-stone-400" : "text-stone-700"
-        }`}
+        className="flex items-center gap-1.5 mb-3"
       >
-        {task.name}
-      </p>
+        <p
+          className={`text-sm font-semibold leading-snug cursor-pointer hover:text-indigo-600 transition-colors truncate ${
+            isDone ? "line-through text-stone-400" : "text-stone-700"
+          }`}
+        >
+          {task.name}
+        </p>
+
+        {/* ✅ Icon khóa cạnh name — chỉ hiện với task private */}
+        {isPrivate && (
+          <span
+            title={
+              canView
+                ? "Private task (you have access)"
+                : "Private task — you don't have access"
+            }
+            className={`material-symbols-outlined text-[13px] flex-shrink-0 select-none ${
+              canView ? "text-stone-300" : "text-amber-400"
+            }`}
+          >
+            lock
+          </span>
+        )}
+      </div>
 
       {/* Tag */}
       {task.tag && (
@@ -152,6 +113,7 @@ const TaskCard: React.FC<{
           </span>
         </div>
       )}
+
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
         {/* Status badge */}
@@ -180,7 +142,7 @@ const TaskCard: React.FC<{
         )}
       </div>
 
-      {/* Date row — chỉ render nếu có ít nhất 1 date */}
+      {/* Date row */}
       {(task.startDate || task.dueDate) && (
         <div className="flex items-center gap-1.5 mt-2.5 text-[11px] font-medium tabular-nums text-stone-400">
           <svg
@@ -208,7 +170,7 @@ const TaskCard: React.FC<{
         </div>
       )}
 
-      {/* Drag handle hint (visible on hover) */}
+      {/* Drag handle hint */}
       <div className="absolute top-1/2 -translate-y-1/2 -left-1 opacity-0 group-hover:opacity-100 transition-opacity"></div>
     </div>
   );

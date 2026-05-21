@@ -10,12 +10,7 @@ import {
   QUILL_MODULES,
   today,
 } from "../../constants";
-import {
-  CreateTaskFormData,
-  CreateTaskSchema,
-  UpdateTaskFormData,
-  UpdateTaskSchema,
-} from "../../validations/task";
+import { UpdateTaskFormData, UpdateTaskSchema } from "../../validations/task";
 import { stripHtml, toISO } from "../../lib/until";
 import { AssigneeDropdown } from "./AssigneeDropdown";
 
@@ -52,6 +47,7 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
       startDate: task.startDate ? task.startDate.slice(0, 10) : undefined,
       dueDate: task.dueDate ? task.dueDate.slice(0, 10) : undefined,
       tag: task.tag ?? "",
+      isPublic: task.isPublic ?? true,
     },
   });
 
@@ -239,42 +235,87 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
           </p>
         )}
       </div>
+
       {/* Actions */}
-      <div className="flex gap-1.5 mt-2 p-3">
-        <button
-          onClick={handleSubmit(onSubmit)}
-          disabled={isSubmitting}
-          className="flex items-center gap-1 px-2.5 py-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
-        >
-          {isSubmitting ? (
-            <svg
-              className="w-2.5 h-2.5 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v8z"
-              />
-            </svg>
-          ) : null}
-          Save
-        </button>
-        <button
-          onClick={onClose}
-          className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-500 text-[10px] font-bold rounded-lg transition-colors"
-        >
-          Cancel
-        </button>
+      <div className="flex items-center gap-3 mt-2 p-3">
+        {/* isPublic toggle */}
+        <Controller
+          control={control}
+          name="isPublic"
+          render={({ field }) => {
+            const isPublic = field.value ?? false;
+
+            return (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span
+                  className={`text-[11px] font-medium transition-colors ${
+                    isPublic ? "text-indigo-500" : "text-stone-400"
+                  }`}
+                >
+                  {isPublic ? "Public" : "Private"}
+                </span>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isPublic}
+                  onClick={() => field.onChange(!isPublic)}
+                  className={`
+                    relative inline-flex h-[17px] w-7 flex-shrink-0 rounded-full border-2 border-transparent
+                    transition-colors duration-200 ease-in-out
+                    focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1
+                    ${isPublic ? "bg-indigo-500" : "bg-stone-200"}
+                  `}
+                >
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm
+                      transform transition duration-200 ease-in-out
+                      ${isPublic ? "translate-x-3.5" : "translate-x-0"}
+                    `}
+                  />
+                </button>
+              </label>
+            );
+          }}
+        />
+
+        <div className="flex gap-1.5">
+          <button
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="flex items-center gap-1 px-2.5 py-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
+          >
+            {isSubmitting ? (
+              <svg
+                className="w-2.5 h-2.5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
+                />
+              </svg>
+            ) : null}
+            Save
+          </button>
+          <button
+            onClick={onClose}
+            className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-500 text-[10px] font-bold rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </form>
   );

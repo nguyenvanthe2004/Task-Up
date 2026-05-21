@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsArray,
   IsInt,
+  IsBoolean,
 } from "class-validator";
 import { PriorityStatus } from "../models/Task";
 
@@ -37,6 +38,10 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  @IsBoolean() 
+  @IsOptional()
+  isPublic?: boolean;
 
   @IsNumber()
   statusId?: number;
@@ -77,6 +82,10 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isPublic?: boolean;
   
   @IsOptional()
   @IsNumber()

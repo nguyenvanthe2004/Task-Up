@@ -45,6 +45,16 @@ export class TaskService {
     return workspace.ownerId === userId;
   }
 
+  private async assertIsMember(
+    spaceId: number,
+    userId: number,
+  ): Promise<boolean> {
+    const isMember = await this.spaceRepo.isMember(spaceId, userId);
+    if (!isMember)
+      throw new BadRequestError("You are not a member of this space");
+    return true;
+  }
+
   async countByList(listId: number) {
     return await this.taskRepo.countBySpace(listId);
   }
@@ -88,9 +98,7 @@ export class TaskService {
     if (!space) throw new NotFoundError("Space not found");
 
     const isOwner = await this.assertIsOwner(space.workspaceId, user.id);
-    if (!isOwner) {
-      throw new BadRequestError("Only workspace owner can create task");
-    }
+    if (!isOwner) await this.assertIsMember(space.id, user.id);
 
     const task = await this.taskRepo.create(listId, statusId, data);
 
@@ -103,11 +111,35 @@ export class TaskService {
     const task = await this.taskRepo.findById(id);
     if (!task) throw new NotFoundError("Task not found");
 
+    const list = await this.listRepo.findById(task.listId);
+    if (!list) throw new BadRequestError("List not found");
+
+    const category = await this.categoryRepo.findById(list.categoryId);
+    if (!category) throw new NotFoundError("Category not found");
+
+    const space = await this.spaceRepo.findById(category.spaceId);
+    if (!space) throw new NotFoundError("Space not found");
+
+    const isOwner = await this.assertIsOwner(space.workspaceId, user.id);
+
+    if (!isOwner) {
+      await this.assertIsMember(space.id, user.id);
+
+      const isAssignee = task.assignees?.some((a: any) => a.id === user.id);
+      if (!isAssignee) {
+        throw new BadRequestError("You can only update tasks assigned to you");
+      }
+    }
+
     const oldStatusId = task.statusId;
     const oldName = task.name;
     const oldPriority = task.priority;
-    const oldDueDate = task.dueDate ? new Date(task.dueDate).toDateString() : null;
-    const newDueDate = data.dueDate ? new Date(data.dueDate).toDateString() : null;
+    const oldDueDate = task.dueDate
+      ? new Date(task.dueDate).toDateString()
+      : null;
+    const newDueDate = data.dueDate
+      ? new Date(data.dueDate).toDateString()
+      : null;
 
     const updatedTask = await this.taskRepo.update(id, data);
 
@@ -126,7 +158,11 @@ export class TaskService {
     }
 
     if (data.dueDate !== undefined && newDueDate !== oldDueDate) {
-      await this.activityService.logDueDateChange(id, user, data.dueDate ?? null);
+      await this.activityService.logDueDateChange(
+        id,
+        user,
+        data.dueDate ?? null,
+      );
     }
 
     return updatedTask;
@@ -146,12 +182,17 @@ export class TaskService {
     if (!space) throw new NotFoundError("Space not found");
 
     const isOwner = await this.assertIsOwner(space.workspaceId, user.id);
+
     if (!isOwner) {
-      throw new BadRequestError("Only workspace owner can delete task");
+      await this.assertIsMember(space.id, user.id);
+
+      const isAssignee = task.assignees?.some((a: any) => a.id === user.id);
+      if (!isAssignee) {
+        throw new BadRequestError("You can only delete tasks assigned to you");
+      }
     }
 
     await this.activityService.logDeleted(id, user, task.name);
-
     return await this.taskRepo.delete(id);
   }
 }

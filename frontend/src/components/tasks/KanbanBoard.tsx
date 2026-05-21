@@ -2,7 +2,6 @@ import React, {
   useState,
   useCallback,
   useEffect,
-  useRef,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -10,17 +9,14 @@ import { useParams } from "react-router-dom";
 import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
 import DetailTask from "./DetailTask";
-import { priorityBadge } from "../../constants";
 import {
   callDeleteTask,
   callGetTasks,
   callUpdateTask,
-  callCreateTask,
 } from "../../services/task";
 import { callGetStatuses } from "../../services/status";
 import { callGetSpaceMembers } from "../../services/space";
 import { toastError, toastSuccess } from "../../lib/toast";
-import { fmtDate } from "../../lib/until";
 import { useModal } from "../../hook/useModal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
 import TaskCard from "./TaskCard";
@@ -28,9 +24,25 @@ import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
 import { InlineCreateCard } from "../tools/InlineCreateCard";
 import { InlineEditCard } from "../tools/InlineEditCard";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+
+const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 
 const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
   const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -101,6 +113,12 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
     fetchData();
   }, [fetchData]);
 
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelectedTask(task);
+  };
+
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
       await callUpdateTask(id, data);
@@ -125,6 +143,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
   };
 
   const handleBulkDelete = async () => {
+    if (checkedIds.size === 0) return;
     try {
       setDeleting(true);
       await Promise.all([...checkedIds].map(callDeleteTask));
@@ -177,7 +196,6 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
     }
   };
 
-  // ── Drag & drop ───────────────────────────────────────────────────────────
   const handleDrop = (toStatusId: number) => {
     if (!dragging) return;
     const { taskId, fromStatusId } = dragging;
@@ -213,7 +231,6 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
     });
   };
 
-  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="w-full mt-6 flex gap-3 overflow-x-auto pb-4">
@@ -257,7 +274,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
               key={group.status.id}
               className={`
                 flex-none flex flex-col
-                w-[240px] sm:w-[260px] lg:w-64
+                w-[280px] sm:w-[320px] lg:w-[360px]
                 rounded-2xl border transition-all duration-150
                 ${
                   dragOver === group.status.id
@@ -357,9 +374,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
                         setDragging(null);
                         setDragOver(null);
                       }}
-                      className={
-                        dragging?.taskId === task.id ? "opacity-40" : ""
-                      }
+                      className={`relative ${dragging?.taskId === task.id ? "opacity-40" : ""}`}
                     >
                       <TaskCard
                         task={task}
@@ -367,7 +382,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
                         isChecked={checkedIds.has(task.id)}
                         statuses={statuses}
                         members={members}
-                        onSelect={setSelectedTask}
+                        onSelect={handleTaskClick}
                         onDelete={(id) => {
                           setDeleteId(id);
                           setCheckedIds(new Set([id]));
@@ -376,6 +391,22 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
                         onEdit={(id) => setEditingTaskId(id)}
                         onCheck={toggleCheck}
                       />
+                      {!isTaskPublic(task) && (
+                        <span
+                          title={
+                            user && canViewTask(task, user.id)
+                              ? "Private task (you have access)"
+                              : "Private task — you don't have access"
+                          }
+                          className={`material-symbols-outlined absolute top-2 right-2 text-[13px] select-none pointer-events-none ${
+                            user && canViewTask(task, user.id)
+                              ? "text-stone-300"
+                              : "text-amber-400"
+                          }`}
+                        >
+                          lock
+                        </span>
+                      )}
                     </div>
                   ),
                 )}
@@ -487,37 +518,41 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
                   Status
                 </span>
               </button>
-              <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  const firstId = [...checkedIds][0];
-                  if (firstId) {
-                    setEditingTaskId(firstId);
-                    setCheckedIds(new Set());
-                  }
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
-              </button>
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    setBulkAssignOpen(true);
+                    setBulkStatusOpen(false);
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    person_add
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Assign
+                  </span>
+                </button>
+              )}
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    const firstId = [...checkedIds][0];
+                    if (firstId) {
+                      setEditingTaskId(firstId);
+                      setCheckedIds(new Set());
+                    }
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    edit
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Edit
+                  </span>
+                </button>
+              )}
               <button
                 onClick={open}
                 disabled={deleting}

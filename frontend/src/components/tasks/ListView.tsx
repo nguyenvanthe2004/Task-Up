@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useImperativeHandle,
   forwardRef,
+  useEffect,
 } from "react";
 import {
   DragDropContext,
@@ -27,24 +28,42 @@ import { AvatarStack } from "../ui/AvatarStack";
 import { fmtDate } from "../../lib/until";
 import { useModal } from "../../hook/useModal";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
-
-import { useEffect } from "react";
 import { GRID_COLS, InlineCreateRow } from "../tools/InlineCreateRow";
 import InlineEditRow from "../tools/InlineEditRow";
 import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+
+const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 
 const ListView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
+  const { listId, spaceId, workspaceId } = useParams<{
+    listId: string;
+    spaceId: string;
+    workspaceId: string;
+  }>();
+
+  const user = useSelector((state: RootState) => state.auth.currentUser);
+
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selected, setSelected] = useState<Task | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [openInlineStatusId, setOpenInlineStatusId] = useState<number | null>(
-    null,
-  );
+  const [openInlineStatusId, setOpenInlineStatusId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
@@ -88,8 +107,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
     }
   }, [listId, spaceId]);
 
-  console.log(statuses)
-
   useImperativeHandle(ref, () => ({
     refresh: fetchData,
     getTasks: () => groups.flatMap((g) => g.tasks),
@@ -98,6 +115,12 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   useEffect(() => {
     fetchData();
   }, [listId]);
+
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelected(task);
+  };
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -112,7 +135,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                   (data.assignees as number[]).includes(m.id),
                 )
               : t.assignees;
-
             return { ...t, ...data, assignees: updatedAssignees };
           }),
         })),
@@ -123,7 +145,7 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   };
 
   const handleBulkDelete = async () => {
-    if (!deleteId) return;
+    if (checkedIds.size === 0) return;
     try {
       setDeleting(true);
       await Promise.all([...checkedIds].map(callDeleteTask));
@@ -243,14 +265,19 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
       key: "name",
       render: (row: Task) => {
         const index = groupTasks.findIndex((t) => t.id === row.id);
+        const taskIsPublic = isTaskPublic(row);
+        const allowed = user ? canViewTask(row, user.id) : false;
+
         return (
           <Draggable draggableId={String(row.id)} index={index} key={row.id}>
             {(provided, snapshot) => (
               <div
                 ref={provided.innerRef}
                 {...provided.draggableProps}
-                onClick={() => setSelected(row)}
-                className={`flex items-center gap-2.5 cursor-pointer group/row transition-opacity ${snapshot.isDragging ? "opacity-50" : ""}`}
+                onClick={() => handleTaskClick(row)}
+                className={`flex items-center gap-2.5 transition-opacity ${
+                  snapshot.isDragging ? "opacity-50" : ""
+                } ${allowed ? "cursor-pointer group/row" : "cursor-not-allowed"}`}
               >
                 <span
                   {...provided.dragHandleProps}
@@ -274,9 +301,31 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                   }
                   className="accent-indigo-500 w-4 h-4 rounded-full"
                 />
-                <span className="text-[13px] font-medium text-stone-700 group-hover/row:text-indigo-600 transition-colors truncate leading-tight">
+
+                <span
+                  className={`text-[13px] font-medium truncate leading-tight transition-colors ${
+                    allowed
+                      ? "text-stone-700 group-hover/row:text-indigo-600"
+                      : "text-stone-400"
+                  }`}
+                >
                   {row.name}
                 </span>
+
+                {!taskIsPublic && (
+                  <span
+                    title={
+                      allowed
+                        ? "Private task (you have access)"
+                        : "Private task — you don't have access"
+                    }
+                    className={`material-symbols-outlined text-[13px] flex-shrink-0 ${
+                      allowed ? "text-stone-300" : "text-amber-400"
+                    }`}
+                  >
+                    lock
+                  </span>
+                )}
               </div>
             )}
           </Draggable>

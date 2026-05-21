@@ -29,6 +29,21 @@ import MiniMonth from "../ui/MiniMonth";
 import { AvatarStack } from "../ui/AvatarStack";
 import { InlineDayEdit } from "../tools/InlineDayEdit";
 import { InlineDayCreate } from "../tools/InlineDayCreate";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+
+const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 
 const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
@@ -55,6 +70,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const [dragId, setDragId] = useState<number | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
@@ -88,6 +105,12 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelected(task);
+  };
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -193,6 +216,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const renderPill = (task: Task, compact = false) => {
     const status = statuses.find((s) => s.id === task.statusId);
     const isChecked = checkedIds.has(task.id);
+    const taskIsPublic = isTaskPublic(task);
+    const allowed = user ? canViewTask(task, user.id) : false;
 
     if (editingTaskId === task.id) {
       return (
@@ -218,12 +243,12 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         onDragEnd={() => setDragId(null)}
         onClick={(e) => {
           e.stopPropagation();
-          setSelected(task);
+          handleTaskClick(task);
         }}
         className={`
-          group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md cursor-pointer
-          hover:opacity-90 transition-all text-[10px] font-semibold truncate
+          group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all text-[10px] font-semibold truncate
           border-l-2
+          ${allowed ? "cursor-pointer hover:opacity-90" : "cursor-not-allowed opacity-70"}
           ${isChecked ? "ring-1 ring-indigo-400 ring-offset-0" : ""}
           ${dragId === task.id ? "opacity-40" : ""}
         `}
@@ -242,7 +267,28 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
           className="accent-indigo-500 w-3 h-3 rounded flex-none opacity-0 group-hover/pill:opacity-100 transition-opacity"
           style={isChecked ? { opacity: 1 } : {}}
         />
-        <span className="truncate flex-1">{task.name}</span>
+        <span className={`truncate flex-1 ${!allowed ? "text-stone-400" : ""}`}>
+          {task.name}
+        </span>
+
+        {!taskIsPublic && (
+          <span
+            title={
+              allowed
+                ? "Private task (you have access)"
+                : "Private task — you don't have access"
+            }
+            className="material-symbols-outlined flex-none"
+            style={{
+              fontSize: "10px",
+              color: allowed ? "currentColor" : "#f59e0b",
+              opacity: allowed ? 0.5 : 1,
+            }}
+          >
+            lock
+          </span>
+        )}
+
         {task.priority && !compact && (
           <span
             className="w-1.5 h-1.5 rounded-full flex-none"
@@ -251,33 +297,33 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
             }}
           />
         )}
-        {/* Edit on hover */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingTaskId(task.id);
-          }}
-          className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
-        >
-          <svg
-            className="w-2.5 h-2.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
+        {allowed && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingTaskId(task.id);
+            }}
+            className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-2.5 h-2.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+              />
+            </svg>
+          </button>
+        )}
       </div>
     );
   };
 
-  // ── Skeleton ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -303,7 +349,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
     );
   }
 
-  // ── Main ────────────────────────────────────────────────────────────────────
   return (
     <div
       className="w-full mt-4 flex gap-0 overflow-hidden rounded-xl border border-stone-200/60 bg-white/60"
@@ -573,6 +618,8 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
               {unscheduled.map((t) => {
                 const status = statuses.find((s) => s.id === t.statusId);
                 const isChecked = checkedIds.has(t.id);
+                const taskIsPublic = isTaskPublic(t);
+                const allowed = user ? canViewTask(t, user.id) : false;
 
                 return (
                   <div
@@ -580,10 +627,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                     draggable
                     onDragStart={() => setDragId(t.id)}
                     onDragEnd={() => setDragId(null)}
-                    onClick={() => setSelected(t)}
+                    onClick={() => handleTaskClick(t)}
                     className={`
                       p-2.5 bg-white rounded-xl border shadow-sm
-                      hover:border-indigo-200 hover:shadow-md transition-all cursor-grab active:cursor-grabbing group/unsched
+                      hover:border-indigo-200 hover:shadow-md transition-all group/unsched
+                      ${allowed ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"}
                       ${isChecked ? "border-indigo-300 ring-1 ring-indigo-200" : "border-stone-100"}
                       ${dragId === t.id ? "opacity-40" : ""}
                     `}
@@ -597,30 +645,57 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                         className="accent-indigo-500 w-3.5 h-3.5 mt-0.5 flex-none opacity-0 group-hover/unsched:opacity-100 transition-opacity"
                         style={isChecked ? { opacity: 1 } : {}}
                       />
-                      <span className="text-[11px] font-semibold text-stone-700 leading-snug flex-1 group-hover/unsched:text-indigo-600 transition-colors">
+                      <span
+                        className={`text-[11px] font-semibold leading-snug flex-1 transition-colors ${
+                          allowed
+                            ? "text-stone-700 group-hover/unsched:text-indigo-600"
+                            : "text-stone-400"
+                        }`}
+                      >
                         {t.name}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTaskId(t.id);
-                        }}
-                        className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
-                      >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          viewBox="0 0 24 24"
+
+                      {!taskIsPublic && (
+                        <span
+                          title={
+                            allowed
+                              ? "Private task (you have access)"
+                              : "Private task — you don't have access"
+                          }
+                          className="material-symbols-outlined flex-none"
+                          style={{
+                            fontSize: "12px",
+                            color: allowed ? "#d6d3d1" : "#f59e0b",
+                          }}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-                          />
-                        </svg>
-                      </button>
+                          lock
+                        </span>
+                      )}
+
+                      {/* Edit button — chỉ cho phép nếu có quyền */}
+                      {allowed && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTaskId(t.id);
+                          }}
+                          className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
+                        >
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
                     {/* Edit inline in sidebar */}

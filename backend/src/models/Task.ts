@@ -17,6 +17,7 @@ interface TaskAttributes {
   tag?: string;
   startDate?: Date;
   dueDate?: Date;
+  isPublic?: boolean;
   statusId: number;
   listId: number;
   createdAt?: Date;
@@ -36,8 +37,10 @@ export class Task
   declare tag?: string;
   declare startDate?: Date;
   declare dueDate?: Date;
+  declare isPublic?: boolean;
   declare statusId: number;
   declare listId: number;
+  declare assignees?: User[];
 
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -80,6 +83,11 @@ Task.init(
     dueDate: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+
+    isPublic: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
 
     statusId: {

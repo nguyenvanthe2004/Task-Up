@@ -114,6 +114,21 @@ export class SpaceRepository {
     });
   }
 
+  async isMember(spaceId: number, userId: number): Promise<boolean> {
+    const space = await Space.findOne({
+      where: { id: spaceId },
+      include: [
+        {
+          model: User,
+          as: "members",
+          where: { id: userId },
+          required: true,
+        },
+      ],
+    });
+    return !!space;
+  }
+
   async create(workspaceId: number, data: CreateSpaceInput) {
     return await Space.create({
       ...data,

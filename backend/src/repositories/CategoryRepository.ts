@@ -32,6 +32,7 @@ export class CategoryRepository {
                 "dueDate",
                 "statusId",
                 "listId",
+                "isPublic",
               ],
               include: [
                 {

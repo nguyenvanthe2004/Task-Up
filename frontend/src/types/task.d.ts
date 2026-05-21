@@ -37,7 +37,8 @@ export interface CreateTask {
   tag?: string;
   startDate?: string;
   dueDate?: string;
-  statusId?: number; 
+  isPublic?: boolean;
+  statusId?: number;
   listId?: number;
   assignees?: number[];
 }
@@ -49,6 +50,7 @@ export interface UpdateTask {
   tag?: string;
   startDate?: string;
   dueDate?: string;
+  isPublic?: boolean;
   statusId?: number;
   assignees?: number[];
 }
@@ -61,6 +63,7 @@ export interface Task {
   statusId: number;
   dueDate?: string;
   startDate?: string;
+  isPublic?: boolean;
   tag?: string;
   listId?: number;
   assignees?: AvatarMember[];
@@ -74,6 +77,10 @@ export interface Task {
       space: {
         id: number;
         name: string;
+        workspace: {
+          id: number;
+          ownerId: number;
+        };
       };
     };
   };

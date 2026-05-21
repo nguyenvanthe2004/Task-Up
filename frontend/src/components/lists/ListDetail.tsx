@@ -336,7 +336,7 @@ const ListDetail: React.FC = () => {
                 </div>
               )}
             </div>
-            <StatusManager spaceId={Number(spaceId)} />
+            <StatusManager spaceId={Number(spaceId)} onStatusChange={() => listViewRef.current?.refresh()} />
           </div>
         </div>
 

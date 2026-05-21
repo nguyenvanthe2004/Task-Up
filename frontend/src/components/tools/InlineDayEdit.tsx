@@ -39,6 +39,7 @@ export const InlineDayEdit: React.FC<{
       startDate: task.startDate ? task.startDate.slice(0, 10) : undefined,
       dueDate: task.dueDate ? task.dueDate.slice(0, 10) : undefined,
       tag: task.tag ?? "",
+      isPublic: task.isPublic ?? true,
     },
   });
 
@@ -214,6 +215,47 @@ export const InlineDayEdit: React.FC<{
           {errors.description.message}
         </p>
       )}
+
+      <Controller
+        control={control}
+        name="isPublic"
+        render={({ field }) => {
+          const isPublic = field.value ?? false;
+
+          return (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <span
+                className={`text-[11px] font-medium transition-colors ${
+                  isPublic ? "text-indigo-500" : "text-stone-400"
+                }`}
+              >
+                {isPublic ? "Public" : "Private"}
+              </span>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isPublic}
+                onClick={() => field.onChange(!isPublic)}
+                className={`
+                  relative inline-flex h-[17px] w-7 flex-shrink-0 rounded-full border-2 border-transparent
+                  transition-colors duration-200 ease-in-out
+                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1
+                  ${isPublic ? "bg-indigo-500" : "bg-stone-200"}
+                `}
+              >
+                <span
+                  className={`
+                    pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm
+                    transform transition duration-200 ease-in-out
+                    ${isPublic ? "translate-x-3.5" : "translate-x-0"}
+                  `}
+                />
+              </button>
+            </label>
+          );
+        }}
+      />
 
       {/* Actions */}
       <div className="flex gap-1.5">

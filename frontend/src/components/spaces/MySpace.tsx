@@ -35,6 +35,8 @@ import { UserWorkspace } from "../../types/workspace";
 import UpdateSpaceModal from "./UpdateSpaceModal";
 import EllipsisMenu, { MenuAction } from "../ui/EllipsisMenu";
 import dayjs from "dayjs";
+import { RootState } from "../../redux/store";
+import { useSelector } from "react-redux";
 
 const MySpace: React.FC = () => {
   const navigate = useNavigate();
@@ -55,6 +57,7 @@ const MySpace: React.FC = () => {
   const [editingSpaceId, setEditingSpaceId] = useState<number | null>(null);
 
   const memberModalRef = useRef<AddMemberModalHandle>(null);
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const { isOpen, open, close } = useModal();
   const {
@@ -174,6 +177,8 @@ const MySpace: React.FC = () => {
   const renderCard = (space: Space, wide = false) => {
     const members = spaceMembersMap[space.id] ?? space.members ?? [];
 
+    const isMember = members.some((m) => m.id === user?.id);
+
     const menuActions: MenuAction[] = [
       {
         label: "Edit",
@@ -207,10 +212,7 @@ const MySpace: React.FC = () => {
               color: space.color ?? undefined,
             }}
           >
-            <SpaceIcon
-              icon={space.icon}
-              className={"w-6 h-6"}
-            />
+            <SpaceIcon icon={space.icon} className={"w-6 h-6"} />
           </div>
           {space.workspaceId?.name && (
             <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-md mr-16">
@@ -219,9 +221,7 @@ const MySpace: React.FC = () => {
           )}
         </div>
 
-        <h3
-          className={`text-lg font-bold text-on-surface mb-1`}
-        >
+        <h3 className={`text-lg font-bold text-on-surface mb-1`}>
           {space.name}
         </h3>
         <p className="text-sm text-on-surface-variant mb-4 line-clamp-2">
@@ -238,9 +238,13 @@ const MySpace: React.FC = () => {
             Add member
           </button>
           <button
-            onClick={() =>
-              navigate(`${space.id}`, { state: { spaceId: space.id } })
-            }
+            onClick={() => {
+              if (!isMember) {
+                toastError("You are not a member of this space.");
+                return;
+              }
+              navigate(`${space.id}`, { state: { spaceId: space.id } });
+            }}
             className="text-primary text-sm font-bold hover:underline"
           >
             {"Manage"}

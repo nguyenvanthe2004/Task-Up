@@ -28,6 +28,8 @@ export const CreateTaskSchema = z.object({
   dueDate: z.string().optional(),
 
   assignees: z.array(z.number().int("Assignee must be a number")).optional(),
+
+  isPublic: z.boolean().optional(),
 });
 
 export type CreateTaskFormData = z.infer<typeof CreateTaskSchema>;
@@ -60,7 +62,9 @@ export const UpdateTaskSchema = z.object({
 
   assignees: z.array(z.number().int("Assignee must be a number")).optional(),
 
-  statusId: z.number().int("StatusId must be a number").optional()
+  statusId: z.number().int("StatusId must be a number").optional(),
+
+  isPublic: z.boolean().optional(),
 });
 
 export type UpdateTaskFormData = z.infer<typeof UpdateTaskSchema>;

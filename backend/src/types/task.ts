@@ -8,6 +8,7 @@ export interface CreateTask {
   tag?: string;
   startDate?: string;
   dueDate?: string;
+  isPublic?: boolean;
   assignees?: number[];
 }
 
@@ -18,6 +19,7 @@ export interface UpdateTask {
   tag?: string;
   startDate?: string;
   dueDate?: string;
+  isPublic?: boolean;
   statusId?: number;
   assignees?: number[];
 }
@@ -29,6 +31,7 @@ export interface Task {
   tag?: string;
   startDate?: string;
   dueDate?: string;
+  isPublic?: boolean;
   status: Status[];
   assignees?: number[];
 }

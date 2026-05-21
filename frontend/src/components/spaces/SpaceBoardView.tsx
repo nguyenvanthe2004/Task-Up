@@ -18,6 +18,21 @@ import { InlineEditCard } from "../tools/InlineEditCard";
 import NotFound from "../ui/NotFound";
 import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+
+const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 
 interface StatusGroup {
   status: Status;
@@ -34,6 +49,7 @@ interface CategoryWithGroups extends Category {
 
 const SpaceBoardView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
     [],
@@ -117,6 +133,12 @@ const SpaceBoardView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelectedTask(task);
+  };
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -321,7 +343,7 @@ const SpaceBoardView: React.FC = () => {
               key={sg.status.id}
               className={`
                 flex-none flex flex-col
-                w-[220px] sm:w-[240px] lg:w-56 xl:w-60
+                w-[280px] sm:w-[320px] lg:w-[360px]
                 rounded-2xl border transition-all duration-150
                 ${
                   isOver
@@ -422,9 +444,9 @@ const SpaceBoardView: React.FC = () => {
                         setDragging(null);
                         setDragOver(null);
                       }}
-                      className={
+                      className={`relative ${
                         dragging?.taskId === task.id ? "opacity-40" : ""
-                      }
+                      }`}
                     >
                       <TaskCard
                         task={task}
@@ -432,7 +454,7 @@ const SpaceBoardView: React.FC = () => {
                         isChecked={checkedIds.has(task.id)}
                         statuses={statuses}
                         members={members}
-                        onSelect={setSelectedTask}
+                        onSelect={handleTaskClick}
                         onDelete={(id) => {
                           setDeleteId(id);
                           setCheckedIds(new Set([id]));
@@ -441,6 +463,22 @@ const SpaceBoardView: React.FC = () => {
                         onEdit={(id) => setEditingTaskId(id)}
                         onCheck={toggleCheck}
                       />
+                      {!isTaskPublic(task) && (
+                        <span
+                          title={
+                            user && canViewTask(task, user.id)
+                              ? "Private task (you have access)"
+                              : "Private task — you don't have access"
+                          }
+                          className={`material-symbols-outlined absolute top-2 right-2 text-[13px] select-none pointer-events-none ${
+                            user && canViewTask(task, user.id)
+                              ? "text-stone-300"
+                              : "text-amber-400"
+                          }`}
+                        >
+                          lock
+                        </span>
+                      )}
                     </div>
                   ),
                 )}
@@ -506,7 +544,6 @@ const SpaceBoardView: React.FC = () => {
 
     return (
       <div key={list.id} className="mb-6">
-        {/* List header */}
         <button
           onClick={() => toggleList(list.id)}
           className="flex items-center gap-2.5 mb-3 px-1 w-full text-left group/list"
@@ -542,7 +579,6 @@ const SpaceBoardView: React.FC = () => {
 
     return (
       <div key={cat.id} className="mb-10">
-        {/* Category header */}
         <button
           onClick={() => toggleCategory(cat.id)}
           className="flex items-center gap-2 mb-5 w-full text-left group/cat"
@@ -561,8 +597,6 @@ const SpaceBoardView: React.FC = () => {
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-stone-100 px-1.5 text-[10px] font-bold text-stone-400">
             {totalLists}
           </span>
-
-          {/* Divider line */}
           <div className="flex-1 h-px bg-stone-100 ml-2" />
         </button>
 
@@ -663,37 +697,41 @@ const SpaceBoardView: React.FC = () => {
                   Status
                 </span>
               </button>
-              <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  const firstId = [...checkedIds][0];
-                  if (firstId) {
-                    setEditingTaskId(firstId);
-                    setCheckedIds(new Set());
-                  }
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
-              </button>
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    setBulkAssignOpen(true);
+                    setBulkStatusOpen(false);
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    person_add
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Assign
+                  </span>
+                </button>
+              )}
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    const firstId = [...checkedIds][0];
+                    if (firstId) {
+                      setEditingTaskId(firstId);
+                      setCheckedIds(new Set());
+                    }
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    edit
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Edit
+                  </span>
+                </button>
+              )}
               <button
                 onClick={open}
                 disabled={deleting}
@@ -722,7 +760,6 @@ const SpaceBoardView: React.FC = () => {
         </>
       )}
 
-      {/* ── Confirm delete ── */}
       <ConfirmDeleteModal
         isOpen={isOpen}
         loading={deleting}
@@ -735,7 +772,6 @@ const SpaceBoardView: React.FC = () => {
         onConfirm={handleBulkDelete}
       />
 
-      {/* ── Detail drawer ── */}
       {selectedTask && (
         <DetailTask
           task={selectedTask}

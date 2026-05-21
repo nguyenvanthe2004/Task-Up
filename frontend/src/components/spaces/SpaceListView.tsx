@@ -27,7 +27,23 @@ import { GRID_COLS, InlineCreateRow } from "../tools/InlineCreateRow";
 import InlineEditRow from "../tools/InlineEditRow";
 import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
 
+const isTaskPublic = (task: Task): boolean => {
+  return Boolean(task.isPublic);
+};
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 interface StatusGroup {
   status: Status;
   tasks: Task[];
@@ -43,6 +59,8 @@ interface CategoryWithGroups extends Category {
 
 const SpaceListView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
+
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
     [],
@@ -116,6 +134,12 @@ const SpaceListView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelected(task);
+  };
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -296,14 +320,19 @@ const SpaceListView: React.FC = () => {
       key: "name",
       render: (row: Task) => {
         const index = groupTasks.findIndex((t) => t.id === row.id);
+        const taskIsPublic = isTaskPublic(row);
+        const allowed = user ? canViewTask(row, user.id) : false;
+
         return (
           <Draggable draggableId={String(row.id)} index={index} key={row.id}>
             {(provided, snapshot) => (
               <div
                 ref={provided.innerRef}
                 {...provided.draggableProps}
-                onClick={() => setSelected(row)}
-                className={`flex items-center gap-2.5 cursor-pointer group/row transition-opacity ${snapshot.isDragging ? "opacity-50" : ""}`}
+                onClick={() => handleTaskClick(row)}
+                className={`flex items-center gap-2.5 transition-opacity ${
+                  snapshot.isDragging ? "opacity-50" : ""
+                } ${allowed ? "cursor-pointer group/row" : "cursor-not-allowed"}`}
               >
                 <span
                   {...provided.dragHandleProps}
@@ -327,9 +356,31 @@ const SpaceListView: React.FC = () => {
                   }
                   className="accent-indigo-500 w-4 h-4 rounded-full"
                 />
-                <span className="text-[13px] font-medium text-stone-700 group-hover/row:text-indigo-600 transition-colors truncate leading-tight">
+
+                <span
+                  className={`text-[13px] font-medium truncate leading-tight transition-colors ${
+                    allowed
+                      ? "text-stone-700 group-hover/row:text-indigo-600"
+                      : "text-stone-400"
+                  }`}
+                >
                   {row.name}
                 </span>
+
+                {!taskIsPublic && (
+                  <span
+                    title={
+                      allowed
+                        ? "Private task (you have access)"
+                        : "Private task — you don't have access"
+                    }
+                    className={`material-symbols-outlined text-[13px] flex-shrink-0 ${
+                      allowed ? "text-stone-300" : "text-amber-400"
+                    }`}
+                  >
+                    lock
+                  </span>
+                )}
               </div>
             )}
           </Draggable>
@@ -682,37 +733,41 @@ const SpaceListView: React.FC = () => {
                   Status
                 </span>
               </button>
-              <button
-                onClick={() => {
-                  setBulkAssignOpen(true);
-                  setBulkStatusOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  person_add
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Assign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  const firstId = [...checkedIds][0];
-                  if (firstId) {
-                    setEditingTaskId(firstId);
-                    setCheckedIds(new Set());
-                  }
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  edit
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Edit
-                </span>
-              </button>
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    setBulkAssignOpen(true);
+                    setBulkStatusOpen(false);
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    person_add
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Assign
+                  </span>
+                </button>
+              )}
+              {checkedIds.size === 1 && (
+                <button
+                  onClick={() => {
+                    const firstId = [...checkedIds][0];
+                    if (firstId) {
+                      setEditingTaskId(firstId);
+                      setCheckedIds(new Set());
+                    }
+                  }}
+                  className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-stone-400">
+                    edit
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-stone-400">
+                    Edit
+                  </span>
+                </button>
+              )}
               <button
                 onClick={open}
                 disabled={deleting}

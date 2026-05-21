@@ -17,9 +17,13 @@ const DONE_COLOR = "#22c55e";
 
 interface StatusManagerProps {
   spaceId: number;
+  onStatusChange?: () => void;
 }
 
-const StatusManager: React.FC<StatusManagerProps> = ({ spaceId }) => {
+const StatusManager: React.FC<StatusManagerProps> = ({
+  spaceId,
+  onStatusChange,
+}) => {
   const [open, setOpen] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,6 +88,7 @@ const StatusManager: React.FC<StatusManagerProps> = ({ spaceId }) => {
       });
       setEditingId(null);
       await fetchStatuses();
+      onStatusChange?.();
     } catch (e) {
       console.error(e);
     }
@@ -93,14 +98,11 @@ const StatusManager: React.FC<StatusManagerProps> = ({ spaceId }) => {
     try {
       await callDeleteStatus(id);
       await fetchStatuses();
+      onStatusChange?.();
     } catch (e) {
       console.error(e);
     }
   };
-
-  const usedPositions = statuses
-    .filter((s) => !isDoneStatus(s))
-    .map((s) => s.position ?? 0);
 
   const startAdd = (pos: number) => {
     setAddingPos(pos);
@@ -126,6 +128,7 @@ const StatusManager: React.FC<StatusManagerProps> = ({ spaceId }) => {
       setAddingPos(null);
       setNewName("");
       await fetchStatuses();
+      onStatusChange?.();
     } catch (e) {
       console.error(e);
     }

@@ -222,7 +222,7 @@ const MyTaskBoardView: React.FC = () => {
               key={sg.status.id}
               className={`
                 flex-none flex flex-col
-                w-[240px] sm:w-[260px] lg:w-64
+                w-[280px] sm:w-[320px] lg:w-[360px]
                 rounded-2xl border transition-all duration-150
                 ${
                   isOver

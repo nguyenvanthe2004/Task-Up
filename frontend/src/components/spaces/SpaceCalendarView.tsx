@@ -22,11 +22,26 @@ import { AvatarStack } from "../ui/AvatarStack";
 import { InlineDayCreate } from "../tools/InlineDayCreate";
 import { InlineDayEdit } from "../tools/InlineDayEdit";
 import NotFound from "../ui/NotFound";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
 
 interface ListFlat extends List {
   categoryName: string;
   categoryId: number;
 }
+
+const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
+
+const canViewTask = (task: Task, userId: number): boolean => {
+  if (isTaskPublic(task)) return true;
+
+  const ownerId = task.list?.category?.space?.workspace?.ownerId;
+  if (ownerId !== undefined && ownerId === userId) return true;
+
+  if (task.assignees?.some((a) => a.id === userId)) return true;
+
+  return false;
+};
 
 const SpaceCalendarView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -60,6 +75,8 @@ const SpaceCalendarView: React.FC = () => {
   );
 
   const [activeListId, setActiveListId] = useState<number | null>(null);
+
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
@@ -105,6 +122,12 @@ const SpaceCalendarView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleTaskClick = (task: Task) => {
+    if (!user) return;
+    if (!canViewTask(task, user.id)) return;
+    setSelected(task);
+  };
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -248,6 +271,8 @@ const SpaceCalendarView: React.FC = () => {
     const status = statuses.find((s) => s.id === task.statusId);
     const isChecked = checkedIds.has(task.id);
     const list = lists.find((l) => l.id === task.listId);
+    const taskIsPublic = isTaskPublic(task);
+    const allowed = user ? canViewTask(task, user.id) : false;
 
     if (editingTaskId === task.id) {
       return (
@@ -273,11 +298,11 @@ const SpaceCalendarView: React.FC = () => {
         onDragEnd={() => setDragId(null)}
         onClick={(e) => {
           e.stopPropagation();
-          setSelected(task);
+          handleTaskClick(task);
         }}
         className={`
-          group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md cursor-pointer
-          hover:opacity-90 transition-all text-[10px] font-semibold truncate border-l-2
+          group/pill relative flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all text-[10px] font-semibold truncate border-l-2
+          ${allowed ? "cursor-pointer hover:opacity-90" : "cursor-not-allowed opacity-70"}
           ${isChecked ? "ring-1 ring-indigo-400" : ""}
           ${dragId === task.id ? "opacity-40" : ""}
         `}
@@ -295,7 +320,28 @@ const SpaceCalendarView: React.FC = () => {
           className="accent-indigo-500 w-3 h-3 rounded flex-none opacity-0 group-hover/pill:opacity-100 transition-opacity"
           style={isChecked ? { opacity: 1 } : {}}
         />
-        <span className="truncate flex-1">{task.name}</span>
+        <span className={`truncate flex-1 ${!allowed ? "text-stone-400" : ""}`}>
+          {task.name}
+        </span>
+
+        {!taskIsPublic && (
+          <span
+            title={
+              allowed
+                ? "Private task (you have access)"
+                : "Private task — you don't have access"
+            }
+            className="material-symbols-outlined flex-none"
+            style={{
+              fontSize: "10px",
+              color: allowed ? "currentColor" : "#f59e0b",
+              opacity: allowed ? 0.5 : 1,
+            }}
+          >
+            lock
+          </span>
+        )}
+
         {!activeListId && list && (
           <span
             className="text-[8px] font-bold px-1 py-0.5 rounded flex-none opacity-60 bg-current/10 truncate max-w-[40px]"
@@ -305,32 +351,33 @@ const SpaceCalendarView: React.FC = () => {
           </span>
         )}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingTaskId(task.id);
-          }}
-          className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
-        >
-          <svg
-            className="w-2.5 h-2.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
+        {allowed && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingTaskId(task.id);
+            }}
+            className="opacity-0 group-hover/pill:opacity-100 flex-none text-current transition-opacity"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-2.5 h-2.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+              />
+            </svg>
+          </button>
+        )}
       </div>
     );
   };
 
-  // ── Skeleton ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -356,15 +403,12 @@ const SpaceCalendarView: React.FC = () => {
     );
   }
 
-  // ── Main ────────────────────────────────────────────────────────────────────
   return (
     <div
       className="w-full mt-4 flex gap-0 overflow-hidden rounded-xl border border-stone-200/60 bg-white/60"
       style={{ minHeight: "calc(100vh - 200px)" }}
     >
-      {/* ── Calendar main ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 bg-white/80 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <button
@@ -438,7 +482,6 @@ const SpaceCalendarView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Active list badge */}
             {activeList && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <span className="text-[11px] font-semibold text-indigo-600 truncate max-w-[100px]">
@@ -475,7 +518,6 @@ const SpaceCalendarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Weekday labels */}
         <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/50">
           {WEEKDAYS.map((d) => (
             <div
@@ -504,7 +546,6 @@ const SpaceCalendarView: React.FC = () => {
               cell.day === today.date();
             const MAX_VISIBLE = 3;
 
-            // Create key: date + active list (or first list if none selected)
             const createListId = activeListId ?? lists[0]?.id;
             const createKey = `${dateStr}|${createListId}`;
             const isCreating = openCreateKey === createKey && cell.cur;
@@ -607,7 +648,6 @@ const SpaceCalendarView: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Sidebar ── */}
       {sidebarOpen && (
         <aside
           className="w-56 lg:w-64 flex-none border-l border-stone-100 bg-stone-50/40 flex flex-col overflow-y-auto"
@@ -616,13 +656,11 @@ const SpaceCalendarView: React.FC = () => {
             scrollbarColor: "#e7e5e4 transparent",
           }}
         >
-          {/* Lists by category — filter */}
           <div className="p-4 border-b border-stone-100">
             <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase mb-3">
               Lists
             </h3>
 
-            {/* All lists option */}
             <button
               onClick={() => setActiveListId(null)}
               className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg mb-1 transition-colors text-left ${
@@ -695,7 +733,6 @@ const SpaceCalendarView: React.FC = () => {
             })}
           </div>
 
-          {/* Status summary */}
           <div className="p-4 border-b border-stone-100">
             <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase mb-3">
               Status
@@ -725,7 +762,6 @@ const SpaceCalendarView: React.FC = () => {
             </div>
           </div>
 
-          {/* Unscheduled */}
           <div className="p-4 flex-1">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[10px] font-bold tracking-[0.15em] text-stone-400 uppercase">
@@ -741,6 +777,8 @@ const SpaceCalendarView: React.FC = () => {
                 const status = statuses.find((s) => s.id === t.statusId);
                 const list = lists.find((l) => l.id === t.listId);
                 const isChecked = checkedIds.has(t.id);
+                const taskIsPublic = isTaskPublic(t);
+                const allowed = user ? canViewTask(t, user.id) : false;
 
                 return (
                   <div
@@ -748,10 +786,11 @@ const SpaceCalendarView: React.FC = () => {
                     draggable
                     onDragStart={() => setDragId(t.id)}
                     onDragEnd={() => setDragId(null)}
-                    onClick={() => setSelected(t)}
+                    onClick={() => handleTaskClick(t)}
                     className={`
                       p-2.5 bg-white rounded-xl border shadow-sm
-                      hover:border-indigo-200 hover:shadow-md transition-all cursor-grab active:cursor-grabbing group/unsched
+                      hover:border-indigo-200 hover:shadow-md transition-all group/unsched
+                      ${allowed ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"}
                       ${isChecked ? "border-indigo-300 ring-1 ring-indigo-200" : "border-stone-100"}
                       ${dragId === t.id ? "opacity-40" : ""}
                     `}
@@ -765,33 +804,58 @@ const SpaceCalendarView: React.FC = () => {
                         className="accent-indigo-500 w-3.5 h-3.5 mt-0.5 flex-none opacity-0 group-hover/unsched:opacity-100 transition-opacity"
                         style={isChecked ? { opacity: 1 } : {}}
                       />
-                      <span className="text-[11px] font-semibold text-stone-700 leading-snug flex-1 group-hover/unsched:text-indigo-600 transition-colors">
+                      <span
+                        className={`text-[11px] font-semibold leading-snug flex-1 transition-colors ${
+                          allowed
+                            ? "text-stone-700 group-hover/unsched:text-indigo-600"
+                            : "text-stone-400"
+                        }`}
+                      >
                         {t.name}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTaskId(t.id);
-                        }}
-                        className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
-                      >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          viewBox="0 0 24 24"
+
+                      {!taskIsPublic && (
+                        <span
+                          title={
+                            allowed
+                              ? "Private task (you have access)"
+                              : "Private task — you don't have access"
+                          }
+                          className="material-symbols-outlined flex-none"
+                          style={{
+                            fontSize: "12px",
+                            color: allowed ? "#d6d3d1" : "#f59e0b",
+                          }}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
-                          />
-                        </svg>
-                      </button>
+                          lock
+                        </span>
+                      )}
+
+                      {allowed && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTaskId(t.id);
+                          }}
+                          className="opacity-0 group-hover/unsched:opacity-100 text-stone-300 hover:text-indigo-400 transition-all flex-none"
+                        >
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
-                    {/* Inline edit in sidebar */}
                     {editingTaskId === t.id && (
                       <div
                         className="mt-2"
@@ -807,7 +871,6 @@ const SpaceCalendarView: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Breadcrumb */}
                     {list && (
                       <div className="flex items-center gap-1 mt-1.5 text-[9px] text-stone-400 font-medium">
                         <span className="truncate max-w-[50px]">
@@ -876,7 +939,6 @@ const SpaceCalendarView: React.FC = () => {
             </div>
           </div>
 
-          {/* Mini month */}
           <div className="p-4 border-t border-stone-100">
             <MiniMonth d={current.add(1, "month")} />
           </div>
@@ -979,7 +1041,6 @@ const SpaceCalendarView: React.FC = () => {
         </>
       )}
 
-      {/* ── Confirm delete ── */}
       <ConfirmDeleteModal
         isOpen={isOpen}
         loading={deleting}
@@ -992,7 +1053,6 @@ const SpaceCalendarView: React.FC = () => {
         onConfirm={handleBulkDelete}
       />
 
-      {/* ── Detail drawer ── */}
       {selected && (
         <DetailTask
           task={selected}

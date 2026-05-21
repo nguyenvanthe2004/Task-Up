@@ -47,10 +47,12 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
       description: "",
       priority: PriorityStatus.NORMAL,
       assignees: [],
+      isPublic: false,
     },
   });
 
   const startDate = watch("startDate");
+  const isPublic = watch("isPublic");
 
   useEffect(() => {
     setTimeout(() => nameRef.current?.focus(), 50);
@@ -218,44 +220,41 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
             render={({ field }) => (
               <div
                 className={`
-                  rounded-lg overflow-hidden
-                        border bg-white
-                        ${
-                          errors.description
-                            ? "border-red-300 ring-2 ring-red-100"
-                            : "border-stone-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-50"
-                        }
-                      `}
+                  rounded-lg overflow-hidden border bg-white
+                  ${
+                    errors.description
+                      ? "border-red-300 ring-2 ring-red-100"
+                      : "border-stone-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-50"
+                  }
+                `}
               >
                 <ReactQuill
                   theme="snow"
                   value={field.value ?? ""}
                   onChange={field.onChange}
-                  onBlur={field.onBlur} 
+                  onBlur={field.onBlur}
                   modules={QUILL_MODULES}
                   formats={QUILL_FORMATS}
                   className="quill-inline-v2"
                 />
-
                 <div
                   className={`
-                  text-right text-[10px] px-2.5 py-1
-                  border-t border-stone-100 bg-stone-50
-                  ${
-                    stripHtml(field.value ?? "").length > 1000
-                      ? "text-red-400"
-                      : stripHtml(field.value ?? "").length > 900
-                        ? "text-amber-400"
-                        : "text-stone-300"
-                  }
-            `}
+                    text-right text-[10px] px-2.5 py-1
+                    border-t border-stone-100 bg-stone-50
+                    ${
+                      stripHtml(field.value ?? "").length > 1000
+                        ? "text-red-400"
+                        : stripHtml(field.value ?? "").length > 900
+                          ? "text-amber-400"
+                          : "text-stone-300"
+                    }
+                  `}
                 >
                   {stripHtml(field.value ?? "").length} / 1000
                 </div>
               </div>
             )}
           />
-
           {errors.description && (
             <p className="text-[10px] text-red-400 mt-1">
               {errors.description.message}
@@ -264,23 +263,58 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 pt-1 flex-shrink-0">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="h-[30px] px-3.5 rounded-lg bg-indigo-500 text-white text-[12px] font-medium
-                 hover:bg-indigo-600 disabled:opacity-40 transition-colors"
-          >
-            {isSubmitting ? "…" : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-[30px] w-[30px] flex items-center justify-center rounded-lg
-                 border border-stone-200 text-stone-400 hover:bg-stone-100 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[14px]">close</span>
-          </button>
+        <div className="flex flex-col items-end gap-2.5 pt-1 flex-shrink-0">
+          {/* isPublic toggle */}
+          <Controller
+            control={control}
+            name="isPublic"
+            render={({ field }) => (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className={`text-[11px] font-medium transition-colors ${isPublic ? "text-indigo-500" : "text-stone-400"}`}>
+                  {isPublic ? "Public" : "Private"}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={field.value ?? false}
+                  onClick={() => field.onChange(!field.value)}
+                  className={`
+                    relative inline-flex h-[17px] w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                    transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1
+                    ${field.value ? "bg-indigo-500" : "bg-stone-200"}
+                  `}
+                >
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm
+                      transition duration-200 ease-in-out
+                      ${field.value ? "translate-x-3.5" : "translate-x-0"}
+                    `}
+                  />
+                </button>
+              </label>
+            )}
+          />
+
+          {/* Submit / Close */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="h-[30px] px-3.5 rounded-lg bg-indigo-500 text-white text-[12px] font-medium
+                   hover:bg-indigo-600 disabled:opacity-40 transition-colors"
+            >
+              {isSubmitting ? "…" : "Add"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-[30px] w-[30px] flex items-center justify-center rounded-lg
+                   border border-stone-200 text-stone-400 hover:bg-stone-100 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          </div>
         </div>
       </div>
     </form>

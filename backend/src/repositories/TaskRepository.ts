@@ -114,12 +114,12 @@ export class TaskRepository {
                   as: "space",
                   attributes: ["id", "name"],
                   include: [
-                  {
-                    model: Workspace,
-                    as: "workspace",
-                    attributes: ["id", "name", "ownerId"],
-                  },
-                ],
+                    {
+                      model: Workspace,
+                      as: "workspace",
+                      attributes: ["id", "name", "ownerId"],
+                    },
+                  ],
                 },
               ],
             },
@@ -131,12 +131,13 @@ export class TaskRepository {
   }
 
   async create(listId: number, statusId: number, data: CreateTask) {
-    const { assignees, startDate, dueDate, ...taskData } = data;
+    const { assignees, startDate, dueDate, isPublic, ...taskData } = data;
 
     const task = await Task.create({
       ...taskData,
       startDate: toDate(startDate),
       dueDate: toDate(dueDate),
+      isPublic: isPublic ?? false,
       listId,
       statusId,
     });
@@ -151,13 +152,14 @@ export class TaskRepository {
   }
 
   async update(id: number, data: UpdateTask) {
-    const { assignees, startDate, dueDate, ...taskData } = data;
+    const { assignees, startDate, dueDate, isPublic, ...taskData } = data;
 
     await Task.update(
       {
         ...taskData,
         startDate: toDate(startDate),
         dueDate: toDate(dueDate),
+        ...(isPublic !== undefined && { isPublic }),
       },
       { where: { id } },
     );
