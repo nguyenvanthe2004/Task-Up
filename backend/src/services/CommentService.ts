@@ -5,6 +5,8 @@ import { CommentRepository } from "../repositories/CommentRepository";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { CreateCommentInput, UpdateCommentInput } from "../types/comment";
 import { ActivityService } from "./ActivityService";
+import { NotificationService } from "./NotificationService";
+import { SocketService } from "./SocketService";
 
 @Service()
 export class CommentService {
@@ -15,6 +17,10 @@ export class CommentService {
     private readonly taskRepo: TaskRepository,
     @Inject(() => ActivityService)
     private readonly activityService: ActivityService,
+    @Inject(() => NotificationService)
+    private readonly notificationService: NotificationService,
+    @Inject(() => SocketService)
+    private readonly socketService: SocketService,
   ) {}
 
   async findAll(taskId?: number) {
@@ -36,6 +42,20 @@ export class CommentService {
 
     const comment = await this.commentRepo.create(user.id, data);
     await this.activityService.logCommentAdded(data.taskId, user);
+    await this.notificationService.notifyTaskAssigneesWithReference(
+      data.taskId,
+      user,
+      "comment",
+      "New comment",
+      `${user.fullName} added a comment to task`,
+      comment.id,
+    );
+
+    const recipients = task.assignees?.map((assignee: any) => assignee.id) ?? [];
+    if (recipients.length > 0) {
+      this.socketService.emitCommentCreated(recipients, comment.get({ plain: true }));
+    }
+
     return comment;
   }
 
@@ -46,7 +66,15 @@ export class CommentService {
     if (comment.userId !== user.id)
       throw new BadRequestError("You can only edit your own comments");
 
-    return await this.commentRepo.update(id, user.id, data);
+    const updatedComment = await this.commentRepo.update(id, user.id, data);
+    const task = await this.taskRepo.findById(comment.taskId);
+    const recipients = task?.assignees?.map((assignee: any) => assignee.id) ?? [];
+
+    if (recipients.length > 0) {
+      this.socketService.emitCommentUpdated(recipients, updatedComment.get({ plain: true }));
+    }
+
+    return updatedComment;
   }
 
   async delete(id: number, user: UserProps) {
@@ -56,8 +84,27 @@ export class CommentService {
     if (comment.userId !== user.id)
       throw new BadRequestError("You can only delete your own comments");
 
+    const task = await this.taskRepo.findById(comment.taskId);
     await this.commentRepo.delete(id);
     await this.activityService.logCommentDeleted(comment.taskId, user);
+    await this.notificationService.notifyTaskAssigneesWithReference(
+      comment.taskId,
+      user,
+      "comment",
+      "Comment removed",
+      `${user.fullName} deleted a comment on task`,
+      comment.id,
+    );
+
+    const recipients = task?.assignees?.map((assignee: any) => assignee.id) ?? [];
+    if (recipients.length > 0) {
+      this.socketService.emitCommentDeleted(recipients, {
+        id: comment.id,
+        taskId: comment.taskId,
+        deletedBy: user.id,
+      });
+    }
+
     return { success: true };
   }
 }

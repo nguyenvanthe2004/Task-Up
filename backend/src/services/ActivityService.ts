@@ -4,6 +4,7 @@ import { UserProps } from "../types/auth";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { ActivityRepository } from "../repositories/ActivityRepository";
 import { CreateActivityInput, UpdateActivityInput } from "../types/activityLog";
+import { SocketService } from "./SocketService";
 
 @Service()
 export class ActivityService {
@@ -12,6 +13,8 @@ export class ActivityService {
     private readonly activityRepo: ActivityRepository,
     @Inject(() => TaskRepository)
     private readonly taskRepo: TaskRepository,
+    @Inject(() => SocketService)
+    private readonly socketService: SocketService,
   ) {}
 
   async findAll(taskId?: number) {
@@ -36,11 +39,25 @@ export class ActivityService {
     const task = await this.taskRepo.findById(data.taskId);
     if (!task) throw new NotFoundError("Task not found");
 
-    return await this.activityRepo.create(user.id, data);
+    const activity = await this.activityRepo.create(user.id, data);
+    const plainActivity = activity.get({ plain: true });
+    const recipients = task.assignees?.map((assignee: any) => assignee.id) ?? [];
+    if (recipients.length > 0) {
+      this.socketService.emitActivityCreated(recipients, plainActivity);
+    }
+    return activity;
   }
 
   async log(taskId: number, userId: number, action: string) {
-    return await this.activityRepo.create(userId, { taskId, action });
+    const activity = await this.activityRepo.create(userId, { taskId, action });
+    const task = await this.taskRepo.findById(taskId);
+    if (task) {
+      const recipients = task.assignees?.map((assignee: any) => assignee.id) ?? [];
+      if (recipients.length > 0) {
+        this.socketService.emitActivityCreated(recipients, activity.get({ plain: true }));
+      }
+    }
+    return activity;
   }
 
   async logStatusChange(taskId: number, user: UserProps, newStatusName: string) {

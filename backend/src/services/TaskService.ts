@@ -1,4 +1,5 @@
 import { Inject, Service } from "typedi";
+import Task from "../models/Task";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { ListRepository } from "../repositories/ListRepository";
 import { WorkspaceRepository } from "../repositories/WorkspaceRepository";
@@ -9,6 +10,9 @@ import { StatusRepository } from "../repositories/StatusRepository";
 import { CategoryRepository } from "../repositories/CategoryRepository";
 import { CreateTask, UpdateTask } from "../types/task";
 import { ActivityService } from "./ActivityService";
+import { NotificationService } from "./NotificationService";
+import { SocketService } from "./SocketService";
+import { UserRepository } from "../repositories/UserRepository";
 
 @Service()
 export class TaskService {
@@ -33,6 +37,15 @@ export class TaskService {
 
     @Inject(() => ActivityService)
     private readonly activityService: ActivityService,
+
+    @Inject(() => NotificationService)
+    private readonly notificationService: NotificationService,
+
+    @Inject(() => UserRepository)
+    private readonly userRepo: UserRepository,
+
+    @Inject(() => SocketService)
+    private readonly socketService: SocketService,
   ) {}
 
   private async assertIsOwner(
@@ -60,11 +73,11 @@ export class TaskService {
   }
 
   async findAll(listId?: number, statusId?: number) {
-    const tasks = await this.taskRepo.findAll(listId, statusId);
+    const tasks: Task[] = await this.taskRepo.findAll(listId, statusId);
     return tasks.map((task) => task.get({ plain: true }));
   }
   async findByUser(user: UserProps, statusId?: number) {
-    const tasksByUser = await this.taskRepo.findByUser(user.id, statusId);
+    const tasksByUser: Task[] = await this.taskRepo.findByUser(user.id, statusId);
     return tasksByUser.map((task) => task.get({ plain: true }));
   }
 
@@ -103,6 +116,23 @@ export class TaskService {
     const task = await this.taskRepo.create(listId, statusId, data);
 
     await this.activityService.logCreated(task.id, user, task.name);
+    await this.notificationService.notifyTaskAssigneesWithReference(
+      task.id,
+      user,
+      "task",
+      "New task assigned",
+      `${user.fullName} created task "${task.name}"`,
+      task.id,
+    );
+
+    const assigneeIds = data.assignees ?? [];
+    if (assigneeIds.length > 0) {
+      this.socketService.emitTaskCreated(assigneeIds, {
+        taskId: task.id,
+        name: task.name,
+        createdBy: user.id,
+      });
+    }
 
     return task;
   }
@@ -141,6 +171,15 @@ export class TaskService {
       ? new Date(data.dueDate).toDateString()
       : null;
 
+    const oldAssigneeIds: number[] = task.assignees?.map((a: any) => a.id) ?? [];
+    const newAssigneeIds: number[] = data.assignees ?? oldAssigneeIds;
+    const addedAssigneeIds = data.assignees
+      ? newAssigneeIds.filter((id: number) => oldAssigneeIds.indexOf(id) === -1)
+      : [];
+    const removedAssigneeIds = data.assignees
+      ? oldAssigneeIds.filter((id: number) => newAssigneeIds.indexOf(id) === -1)
+      : [];
+
     const updatedTask = await this.taskRepo.update(id, data);
 
     if (data.statusId !== undefined && data.statusId !== oldStatusId) {
@@ -163,6 +202,73 @@ export class TaskService {
         user,
         data.dueDate ?? null,
       );
+    }
+
+    const changeMessages: string[] = [];
+    if (data.statusId !== undefined && data.statusId !== oldStatusId) {
+      const newStatus = await this.statusRepo.findById(data.statusId);
+      if (newStatus) {
+        changeMessages.push(`Status changed to ${newStatus.name}`);
+      }
+    }
+
+    if (data.name !== undefined && data.name !== oldName) {
+      changeMessages.push(`Renamed from "${oldName}" to "${data.name}"`);
+    }
+
+    if (data.priority !== undefined && data.priority !== oldPriority) {
+      changeMessages.push(`Priority changed to ${data.priority}`);
+    }
+
+    if (data.dueDate !== undefined && newDueDate !== oldDueDate) {
+      changeMessages.push(`Due date updated to ${data.dueDate ?? "none"}`);
+    }
+
+    const affectedAssigneeIds = Array.from(new Set([...oldAssigneeIds, ...newAssigneeIds]));
+
+    if (changeMessages.length > 0) {
+      await this.notificationService.notifyTaskAssigneesWithReference(
+        id,
+        user,
+        "task",
+        "Task updated",
+        `${user.fullName} updated task: ${changeMessages.join("; ")}`,
+        id,
+      );
+
+      if (affectedAssigneeIds.length > 0) {
+        this.socketService.emitTaskUpdated(affectedAssigneeIds, {
+          taskId: id,
+          changes: changeMessages,
+          updatedBy: user.id,
+        });
+      }
+    }
+
+    if (addedAssigneeIds.length > 0 || removedAssigneeIds.length > 0) {
+      const addedUsers = await Promise.all(
+        addedAssigneeIds.map((assigneeId: number) => this.userRepo.findOne(assigneeId)),
+      );
+      const removedUsers = await Promise.all(
+        removedAssigneeIds.map((assigneeId: number) => this.userRepo.findOne(assigneeId)),
+      );
+
+      for (const assignee of addedUsers.filter(Boolean)) {
+        await this.activityService.logAssigneeAdded(id, user, assignee!.fullName);
+      }
+
+      for (const assignee of removedUsers.filter(Boolean)) {
+        await this.activityService.logAssigneeRemoved(id, user, assignee!.fullName);
+      }
+
+      const assigneeChangePayload = {
+        taskId: id,
+        addedAssignees: addedAssigneeIds,
+        removedAssignees: removedAssigneeIds,
+        changedBy: user.id,
+      };
+
+      this.socketService.emitAssigneeChanged(affectedAssigneeIds, assigneeChangePayload);
     }
 
     return updatedTask;
@@ -193,6 +299,24 @@ export class TaskService {
     }
 
     await this.activityService.logDeleted(id, user, task.name);
+    await this.notificationService.notifyTaskAssigneesWithReference(
+      id,
+      user,
+      "task",
+      "Task deleted",
+      `${user.fullName} deleted task "${task.name}"`,
+      id,
+    );
+
+    const assigneeIds = task.assignees?.map((assignee: any) => assignee.id) ?? [];
+    if (assigneeIds.length > 0) {
+      this.socketService.emitTaskDeleted(assigneeIds, {
+        taskId: id,
+        deletedBy: user.id,
+        taskName: task.name,
+      });
+    }
+
     return await this.taskRepo.delete(id);
   }
 }

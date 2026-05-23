@@ -33,6 +33,7 @@
     "reflect-metadata": "^0.2.2",
     "routing-controllers": "^0.11.3",
     "sequelize": "^6.37.8",
+    "socket.io": "^4.11.0",
     "typedi": "^0.10.0"
   },
   "devDependencies": {

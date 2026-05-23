@@ -6,6 +6,7 @@ import { AttachmentRepository } from "../repositories/AttachmentRepository";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { UploadService } from "./UploadService";
 import { ActivityService } from "./ActivityService";
+import { NotificationService } from "./NotificationService";
 
 @Service()
 export class AttachmentService {
@@ -18,6 +19,8 @@ export class AttachmentService {
     private readonly uploadService: UploadService,
     @Inject(() => ActivityService)
     private readonly activityService: ActivityService,
+    @Inject(() => NotificationService)
+    private readonly notificationService: NotificationService,
   ) {}
 
   async findByTaskId(taskId?: number) {
@@ -42,6 +45,14 @@ export class AttachmentService {
           type: file.mimetype,
         });
         await this.activityService.logAttachmentAdded(taskId, user, uploaded.name);
+        await this.notificationService.notifyTaskAssigneesWithReference(
+          taskId,
+          user,
+          "attachment",
+          "Attachment added",
+          `${user.fullName} attached ${uploaded.name} to task`,
+          attachment.id,
+        );
         return attachment;
       }),
     );
@@ -57,6 +68,14 @@ export class AttachmentService {
       throw new BadRequestError("You can only delete your own attachments");
 
     await this.activityService.logAttachmentRemoved(attachment.taskId, user, attachment.fileName);
+    await this.notificationService.notifyTaskAssigneesWithReference(
+      attachment.taskId,
+      user,
+      "attachment",
+      "Attachment removed",
+      `${user.fullName} removed attachment ${attachment.fileName} from task`,
+      attachment.id,
+    );
 
     return await this.attachmentRepo.delete(id);
   }
