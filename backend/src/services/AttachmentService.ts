@@ -6,7 +6,7 @@ import { AttachmentRepository } from "../repositories/AttachmentRepository";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { UploadService } from "./UploadService";
 import { ActivityService } from "./ActivityService";
-import { NotificationService } from "./NotificationService";
+import { SocketService } from "./SocketService";
 
 @Service()
 export class AttachmentService {
@@ -19,8 +19,8 @@ export class AttachmentService {
     private readonly uploadService: UploadService,
     @Inject(() => ActivityService)
     private readonly activityService: ActivityService,
-    @Inject(() => NotificationService)
-    private readonly notificationService: NotificationService,
+    @Inject(() => SocketService)
+    private readonly socketService: SocketService,
   ) {}
 
   async findByTaskId(taskId?: number) {
@@ -33,7 +33,10 @@ export class AttachmentService {
     if (!task) throw new NotFoundError("Task not found");
 
     const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) throw new BadRequestError("No file uploaded");
+    if (!files || files.length === 0)
+      throw new BadRequestError("No file uploaded");
+
+    const recipients = task.assignees?.map((a: any) => a.id) ?? [];
 
     const results = await Promise.all(
       files.map(async (file) => {
@@ -44,16 +47,16 @@ export class AttachmentService {
           fileName: uploaded.name,
           type: file.mimetype,
         });
+
+        const plain = attachment.get({ plain: true });
+
         await this.activityService.logAttachmentAdded(taskId, user, uploaded.name);
-        await this.notificationService.notifyTaskAssigneesWithReference(
-          taskId,
-          user,
-          "attachment",
-          "Attachment added",
-          `${user.fullName} attached ${uploaded.name} to task`,
-          attachment.id,
-        );
-        return attachment;
+
+        if (recipients.length > 0) {
+          this.socketService.emitToUsers(recipients, "attachment:created", plain);
+        }
+
+        return plain;
       }),
     );
 
@@ -67,16 +70,23 @@ export class AttachmentService {
     if (attachment.uploadedBy !== user.id)
       throw new BadRequestError("You can only delete your own attachments");
 
-    await this.activityService.logAttachmentRemoved(attachment.taskId, user, attachment.fileName);
-    await this.notificationService.notifyTaskAssigneesWithReference(
-      attachment.taskId,
-      user,
-      "attachment",
-      "Attachment removed",
-      `${user.fullName} removed attachment ${attachment.fileName} from task`,
-      attachment.id,
-    );
+    const { taskId, fileName, id: attachmentId } = attachment;
 
-    return await this.attachmentRepo.delete(id);
+    const task = await this.taskRepo.findById(taskId);
+    const recipients = task?.assignees?.map((a: any) => a.id) ?? [];
+
+    await this.attachmentRepo.delete(id);
+
+    await this.activityService.logAttachmentRemoved(taskId, user, fileName);
+
+    if (recipients.length > 0) {
+      this.socketService.emitToUsers(recipients, "attachment:deleted", {
+        id: attachmentId,
+        taskId,
+        deletedBy: user.id,
+      });
+    }
+
+    return { success: true };
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
@@ -20,6 +20,8 @@ import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { BASE_URL } from "../../constants";
+import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
@@ -57,7 +59,7 @@ const SpaceBoardView: React.FC = () => {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
-
+  const membersRef = useRef<Member[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -133,6 +135,158 @@ const SpaceBoardView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!user) return;
+    const socket = io(BASE_URL.replace("/api", ""), {
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      socket.emit("join", { userId: user.id });
+    });
+
+    const updateTaskInGroups = (
+      prev: CategoryWithGroups[],
+      taskId: number,
+      updater: (task: Task) => Task,
+    ): CategoryWithGroups[] =>
+      prev.map((cat) => ({
+        ...cat,
+        lists: cat.lists.map((list) => ({
+          ...list,
+          statusGroups: list.statusGroups.map((sg) => ({
+            ...sg,
+            tasks: sg.tasks.map((t) => (t.id === taskId ? updater(t) : t)),
+          })),
+        })),
+      }));
+
+    socket.on("task:created", async (data: { taskId: number }) => {
+      try {
+        const res = await callGetCategories(Number(spaceId));
+        const allTasks: Task[] = (res.data as Category[]).flatMap((cat) =>
+          (cat.lists ?? []).flatMap((list) => (list as any).tasks ?? []),
+        );
+        const newTask = allTasks.find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setCategoryGroups((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            lists: cat.lists.map((list) => ({
+              ...list,
+              statusGroups: list.statusGroups.map((sg) =>
+                sg.status.id === newTask.statusId
+                  ? { ...sg, tasks: [...sg.tasks, newTask] }
+                  : sg,
+              ),
+            })),
+          })),
+        );
+      } catch {}
+    });
+
+    socket.on("task:updated", (data: { task: Task }) => {
+      setCategoryGroups((prev) => {
+        let moved: Task | undefined;
+        const without = prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => {
+              const found = sg.tasks.find((t) => t.id === data.task.id);
+              if (!found) return sg;
+              moved = { ...found, ...data.task, assignees: found.assignees };
+              return {
+                ...sg,
+                tasks: sg.tasks.filter((t) => t.id !== data.task.id),
+              };
+            }),
+          })),
+        }));
+        if (!moved) return prev;
+        const movedTask = moved;
+        return without.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) =>
+              sg.status.id === movedTask.statusId
+                ? { ...sg, tasks: [...sg.tasks, movedTask] }
+                : sg,
+            ),
+          })),
+        }));
+      });
+      setSelectedTask((prev) =>
+        prev?.id === data.task.id
+          ? { ...prev, ...data.task, assignees: prev.assignees }
+          : prev,
+      );
+    });
+
+    socket.on("task:deleted", (data: { taskId: number; taskName: string }) => {
+      setCategoryGroups((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          lists: cat.lists.map((list) => ({
+            ...list,
+            statusGroups: list.statusGroups.map((sg) => ({
+              ...sg,
+              tasks: sg.tasks.filter((t) => t.id !== data.taskId),
+            })),
+          })),
+        })),
+      );
+      setSelectedTask((prev) => (prev?.id === data.taskId ? null : prev));
+      toastSuccess(`Task "${data.taskName}" was deleted.`);
+    });
+
+    socket.on(
+      "task:assignee:changed",
+      (data: {
+        taskId: number;
+        addedAssignees: number[];
+        removedAssignees: number[];
+      }) => {
+        const currentMembers = membersRef.current;
+        const updateAssignees = (assignees: Member[] = []) => {
+          const afterRemove = assignees.filter(
+            (a) => !data.removedAssignees.includes(a.id),
+          );
+          const toAdd = currentMembers.filter((m: Member) =>
+            data.addedAssignees.includes(m.id),
+          );
+          return [
+            ...afterRemove,
+            ...toAdd.filter(
+              (m: Member) => !afterRemove.some((a) => a.id === m.id),
+            ),
+          ];
+        };
+        setCategoryGroups((prev) =>
+          updateTaskInGroups(prev, data.taskId, (t) => ({
+            ...t,
+            assignees: updateAssignees(t.assignees),
+          })),
+        );
+        setSelectedTask((prev) =>
+          prev?.id === data.taskId
+            ? { ...prev, assignees: updateAssignees(prev.assignees) }
+            : prev,
+        );
+      },
+    );
+
+    return () => {
+      socket.emit("leave", { userId: user.id });
+      socket.disconnect();
+    };
+  }, [user?.id, spaceId]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;

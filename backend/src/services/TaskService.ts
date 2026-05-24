@@ -48,20 +48,13 @@ export class TaskService {
     private readonly socketService: SocketService,
   ) {}
 
-  private async assertIsOwner(
-    workspaceId: number,
-    userId: number,
-  ): Promise<boolean> {
+  private async assertIsOwner(workspaceId: number, userId: number) {
     const workspace = await this.workspaceRepo.findOne(workspaceId);
     if (!workspace) throw new NotFoundError("Workspace not found");
-
-    return workspace.ownerId === userId;
+    return workspace.dataValues.ownerId === userId;
   }
 
-  private async assertIsMember(
-    spaceId: number,
-    userId: number,
-  ): Promise<boolean> {
+  private async assertIsMember(spaceId: number, userId: number) {
     const isMember = await this.spaceRepo.isMember(spaceId, userId);
     if (!isMember)
       throw new BadRequestError("You are not a member of this space");
@@ -76,9 +69,10 @@ export class TaskService {
     const tasks: Task[] = await this.taskRepo.findAll(listId, statusId);
     return tasks.map((task) => task.get({ plain: true }));
   }
+
   async findByUser(user: UserProps, statusId?: number) {
-    const tasksByUser: Task[] = await this.taskRepo.findByUser(user.id, statusId);
-    return tasksByUser.map((task) => task.get({ plain: true }));
+    const tasks: Task[] = await this.taskRepo.findByUser(user.id, statusId);
+    return tasks.map((task) => task.get({ plain: true }));
   }
 
   async getSummary(user: UserProps) {
@@ -88,7 +82,6 @@ export class TaskService {
   async findById(id: number) {
     const task = await this.taskRepo.findById(id);
     if (!task) throw new NotFoundError("Task not found");
-
     return task.get({ plain: true });
   }
 
@@ -151,14 +144,16 @@ export class TaskService {
     if (!space) throw new NotFoundError("Space not found");
 
     const isOwner = await this.assertIsOwner(space.workspaceId, user.id);
+    const isAssignee = task.assignees?.some((a: any) => a.id === user.id);
 
-    if (!isOwner) {
-      await this.assertIsMember(space.id, user.id);
-
-      const isAssignee = task.assignees?.some((a: any) => a.id === user.id);
-      if (!isAssignee) {
-        throw new BadRequestError("You can only update tasks assigned to you");
-      }
+    if (!isOwner && !isAssignee)
+      throw new BadRequestError(
+        "You don't have permission to update this task",
+      );
+    if (!isOwner && isAssignee) {
+      const allowedKeys = Object.keys(data).filter((k) => k !== "statusId");
+      if (allowedKeys.length > 0)
+        throw new BadRequestError("Assignees can only update task status");
     }
 
     const oldStatusId = task.statusId;
@@ -171,29 +166,35 @@ export class TaskService {
       ? new Date(data.dueDate).toDateString()
       : null;
 
-    const oldAssigneeIds: number[] = task.assignees?.map((a: any) => a.id) ?? [];
+    const oldAssigneeIds: number[] =
+      task.assignees?.map((a: any) => a.id) ?? [];
     const newAssigneeIds: number[] = data.assignees ?? oldAssigneeIds;
     const addedAssigneeIds = data.assignees
-      ? newAssigneeIds.filter((id: number) => oldAssigneeIds.indexOf(id) === -1)
+      ? newAssigneeIds.filter((uid) => !oldAssigneeIds.includes(uid))
       : [];
     const removedAssigneeIds = data.assignees
-      ? oldAssigneeIds.filter((id: number) => newAssigneeIds.indexOf(id) === -1)
+      ? oldAssigneeIds.filter((uid) => !newAssigneeIds.includes(uid))
       : [];
 
     const updatedTask = await this.taskRepo.update(id, data);
+
+    const changeMessages: string[] = [];
 
     if (data.statusId !== undefined && data.statusId !== oldStatusId) {
       const newStatus = await this.statusRepo.findById(data.statusId);
       if (!newStatus) throw new BadRequestError("Status not found");
       await this.activityService.logStatusChange(id, user, newStatus.name);
+      changeMessages.push(`Status changed to ${newStatus.name}`);
     }
 
     if (data.name !== undefined && data.name !== oldName) {
       await this.activityService.logRenamed(id, user, oldName, data.name);
+      changeMessages.push(`Renamed from "${oldName}" to "${data.name}"`);
     }
 
     if (data.priority !== undefined && data.priority !== oldPriority) {
       await this.activityService.logPriorityChange(id, user, data.priority);
+      changeMessages.push(`Priority changed to ${data.priority}`);
     }
 
     if (data.dueDate !== undefined && newDueDate !== oldDueDate) {
@@ -202,29 +203,12 @@ export class TaskService {
         user,
         data.dueDate ?? null,
       );
-    }
-
-    const changeMessages: string[] = [];
-    if (data.statusId !== undefined && data.statusId !== oldStatusId) {
-      const newStatus = await this.statusRepo.findById(data.statusId);
-      if (newStatus) {
-        changeMessages.push(`Status changed to ${newStatus.name}`);
-      }
-    }
-
-    if (data.name !== undefined && data.name !== oldName) {
-      changeMessages.push(`Renamed from "${oldName}" to "${data.name}"`);
-    }
-
-    if (data.priority !== undefined && data.priority !== oldPriority) {
-      changeMessages.push(`Priority changed to ${data.priority}`);
-    }
-
-    if (data.dueDate !== undefined && newDueDate !== oldDueDate) {
       changeMessages.push(`Due date updated to ${data.dueDate ?? "none"}`);
     }
 
-    const affectedAssigneeIds = Array.from(new Set([...oldAssigneeIds, ...newAssigneeIds]));
+    const affectedAssigneeIds = Array.from(
+      new Set([...oldAssigneeIds, ...newAssigneeIds]),
+    );
 
     if (changeMessages.length > 0) {
       await this.notificationService.notifyTaskAssigneesWithReference(
@@ -237,38 +221,64 @@ export class TaskService {
       );
 
       if (affectedAssigneeIds.length > 0) {
+        const updatedPlain = updatedTask!.get({ plain: true });
         this.socketService.emitTaskUpdated(affectedAssigneeIds, {
           taskId: id,
           changes: changeMessages,
           updatedBy: user.id,
+          task: updatedPlain,
         });
       }
     }
 
     if (addedAssigneeIds.length > 0 || removedAssigneeIds.length > 0) {
       const addedUsers = await Promise.all(
-        addedAssigneeIds.map((assigneeId: number) => this.userRepo.findOne(assigneeId)),
+        addedAssigneeIds.map((uid) => this.userRepo.findOne(uid)),
       );
       const removedUsers = await Promise.all(
-        removedAssigneeIds.map((assigneeId: number) => this.userRepo.findOne(assigneeId)),
+        removedAssigneeIds.map((uid) => this.userRepo.findOne(uid)),
       );
 
       for (const assignee of addedUsers.filter(Boolean)) {
-        await this.activityService.logAssigneeAdded(id, user, assignee!.fullName);
+        await this.activityService.logAssigneeAdded(
+          id,
+          user,
+          assignee!.fullName,
+        );
+
+        await this.notificationService.notifyTaskAssigneesWithReference(
+          id,
+          user,
+          "task",
+          "You were assigned to a task",
+          `${user.fullName} assigned you to task "${task.name}"`,
+          id,
+        );
       }
 
       for (const assignee of removedUsers.filter(Boolean)) {
-        await this.activityService.logAssigneeRemoved(id, user, assignee!.fullName);
+        await this.activityService.logAssigneeRemoved(
+          id,
+          user,
+          assignee!.fullName,
+        );
+
+        await this.notificationService.notifyTaskAssigneesWithReference(
+          id,
+          user,
+          "task",
+          "You were removed from a task",
+          `${user.fullName} removed you from task "${task.name}"`,
+          id,
+        );
       }
 
-      const assigneeChangePayload = {
+      this.socketService.emitAssigneeChanged(affectedAssigneeIds, {
         taskId: id,
         addedAssignees: addedAssigneeIds,
         removedAssignees: removedAssigneeIds,
         changedBy: user.id,
-      };
-
-      this.socketService.emitAssigneeChanged(affectedAssigneeIds, assigneeChangePayload);
+      });
     }
 
     return updatedTask;
@@ -288,35 +298,32 @@ export class TaskService {
     if (!space) throw new NotFoundError("Space not found");
 
     const isOwner = await this.assertIsOwner(space.workspaceId, user.id);
+    if (!isOwner)
+      throw new BadRequestError("Only workspace owner can delete tasks");
 
-    if (!isOwner) {
-      await this.assertIsMember(space.id, user.id);
+    const assigneeIds = task.assignees?.map((a: any) => a.id) ?? [];
+    const taskName = task.name;
 
-      const isAssignee = task.assignees?.some((a: any) => a.id === user.id);
-      if (!isAssignee) {
-        throw new BadRequestError("You can only delete tasks assigned to you");
-      }
-    }
-
-    await this.activityService.logDeleted(id, user, task.name);
+    await this.activityService.logDeleted(id, user, taskName);
     await this.notificationService.notifyTaskAssigneesWithReference(
       id,
       user,
       "task",
       "Task deleted",
-      `${user.fullName} deleted task "${task.name}"`,
+      `${user.fullName} deleted task "${taskName}"`,
       id,
     );
 
-    const assigneeIds = task.assignees?.map((assignee: any) => assignee.id) ?? [];
+    await this.taskRepo.delete(id);
+
     if (assigneeIds.length > 0) {
       this.socketService.emitTaskDeleted(assigneeIds, {
         taskId: id,
         deletedBy: user.id,
-        taskName: task.name,
+        taskName,
       });
     }
 
-    return await this.taskRepo.delete(id);
+    return { success: true };
   }
 }

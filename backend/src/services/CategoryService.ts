@@ -24,7 +24,7 @@ export class CategoryService {
     const workspace = await this.workspaceRepo.findOne(workspaceId);
     if (!workspace) throw new NotFoundError("Workspace not found");
 
-    return workspace.ownerId === userId;
+    return workspace.dataValues.ownerId === userId;
   }
 
   async countBySpace(spaceId: number) {

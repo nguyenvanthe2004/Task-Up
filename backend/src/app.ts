@@ -29,7 +29,6 @@ import { ActivityController } from "./controllers/ActivityController";
 import { AttachmentController } from "./controllers/AttachmentController";
 import { NotificationController } from "./controllers/NotificationController";
 import { initSocket } from "./lib/socket";
-import { NotificationController } from "./controllers/NotificationController";
 
 dotenv.config();
 

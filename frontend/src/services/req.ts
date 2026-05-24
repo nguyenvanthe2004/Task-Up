@@ -1,6 +1,6 @@
 // Setting up Axios in a React.js project
-import axios from 'axios';
-import { BASE_URL } from '../constants';
+import axios from "axios";
+import { BASE_URL } from "../constants";
 
 const instance = axios.create({
   baseURL: BASE_URL,
@@ -15,7 +15,7 @@ instance.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Add global response interceptor
@@ -25,9 +25,9 @@ instance.interceptors.response.use(
     return response;
   },
   (error) => {
-    const normalizeError = error.response.data
+    const normalizeError = error.response.data;
     return Promise.reject(normalizeError);
-  }
+  },
 );
 
-export default instance; 
+export default instance;

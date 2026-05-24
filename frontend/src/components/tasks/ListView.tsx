@@ -4,6 +4,7 @@ import React, {
   useImperativeHandle,
   forwardRef,
   useEffect,
+  useRef,
 } from "react";
 import {
   DragDropContext,
@@ -14,7 +15,7 @@ import {
 import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
 import DetailTask from "./DetailTask";
-import { priorityBadge, PriorityStatus } from "../../constants";
+import { BASE_URL, priorityBadge } from "../../constants";
 import {
   callDeleteTask,
   callGetTasks,
@@ -34,22 +35,20 @@ import BulkStatusModal from "../tools/BulkStatusModal";
 import BulkAssignModal from "../tools/BulkAssignModal";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { io, Socket } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
 const canViewTask = (task: Task, userId: number): boolean => {
   if (isTaskPublic(task)) return true;
-
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
   if (ownerId !== undefined && ownerId === userId) return true;
-
   if (task.assignees?.some((a) => a.id === userId)) return true;
-
   return false;
 };
 
 const ListView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId, workspaceId } = useParams<{
+  const { listId, spaceId } = useParams<{
     listId: string;
     spaceId: string;
     workspaceId: string;
@@ -63,13 +62,16 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   const [selected, setSelected] = useState<Task | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [openInlineStatusId, setOpenInlineStatusId] = useState<number | null>(null);
+  const [openInlineStatusId, setOpenInlineStatusId] = useState<number | null>(
+    null,
+  );
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const membersRef = useRef<Member[]>([]);
 
   const { isOpen, open, close } = useModal();
 
@@ -115,6 +117,134 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   useEffect(() => {
     fetchData();
   }, [listId]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    const socket = io(BASE_URL.replace("/api", ""), {
+      withCredentials: true,
+    });
+    socket.on("connect", () => {
+      socket.emit("join", { userId: user.id });
+    });
+
+    socket.on("task:created", async (data: { taskId: number }) => {
+      try {
+        const res = await callGetTasks(Number(listId));
+        const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.status.id === newTask.statusId
+              ? { ...g, tasks: [...g.tasks, newTask] }
+              : g,
+          ),
+        );
+      } catch {}
+    });
+
+    socket.on("task:updated", (data: { task: Task }) => {
+      setGroups((prev) => {
+        let moved: Task | undefined;
+        const without = prev.map((g) => {
+          const found = g.tasks.find((t) => t.id === data.task.id);
+          if (!found) return g;
+          moved = {
+            ...found,
+            ...data.task,
+            assignees: data.task.assignees ?? found.assignees, // giữ assignees cũ nếu không có
+          };
+          return { ...g, tasks: g.tasks.filter((t) => t.id !== data.task.id) };
+        });
+        if (!moved) return prev;
+        return without.map((g) =>
+          g.status.id === moved!.statusId
+            ? { ...g, tasks: [...g.tasks, moved!] }
+            : g,
+        );
+      });
+      setSelected((prev) =>
+        prev?.id === data.task.id
+          ? {
+              ...prev,
+              ...data.task,
+              assignees: data.task.assignees ?? prev.assignees,
+            }
+          : prev,
+      );
+    });
+
+    socket.on("task:deleted", (data: { taskId: number; taskName: string }) => {
+      console.log("task:deleted:", JSON.stringify(data, null, 2));
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => t.id !== data.taskId),
+        })),
+      );
+      setSelected((prev) => (prev?.id === data.taskId ? null : prev));
+    });
+
+    socket.on(
+      "task:assignee:changed",
+      (data: {
+        taskId: number;
+        addedAssignees: number[];
+        removedAssignees: number[];
+      }) => {
+        const currentMembers = membersRef.current;
+        setGroups((prev) =>
+          prev.map((g) => ({
+            ...g,
+            tasks: g.tasks.map((t) => {
+              if (t.id !== data.taskId) return t;
+              const currentAssignees = t.assignees ?? [];
+              const afterRemove = currentAssignees.filter(
+                (a) => !data.removedAssignees.includes(a.id),
+              );
+              const toAdd = currentMembers.filter((m: Member) =>
+                data.addedAssignees.includes(m.id),
+              );
+              const newAssignees = [
+                ...afterRemove,
+                ...toAdd.filter(
+                  (m: Member) => !afterRemove.some((a) => a.id === m.id),
+                ),
+              ];
+              return { ...t, assignees: newAssignees };
+            }),
+          })),
+        );
+        setSelected((prev) => {
+          if (prev?.id !== data.taskId) return prev;
+          const currentAssignees = prev.assignees ?? [];
+          const afterRemove = currentAssignees.filter(
+            (a) => !data.removedAssignees.includes(a.id),
+          );
+          const toAdd = currentMembers.filter((m: Member) =>
+            data.addedAssignees.includes(m.id),
+          );
+          const newAssignees = [
+            ...afterRemove,
+            ...toAdd.filter(
+              (m: Member) => !afterRemove.some((a) => a.id === m.id),
+            ),
+          ];
+          return { ...prev, assignees: newAssignees };
+        });
+      },
+    );
+
+    return () => {
+      socket.emit("leave", { userId: user.id });
+      socket.disconnect();
+    };
+  }, [user?.id, fetchData]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;
@@ -301,7 +431,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                   }
                   className="accent-indigo-500 w-4 h-4 rounded-full"
                 />
-
                 <span
                   className={`text-[13px] font-medium truncate leading-tight transition-colors ${
                     allowed
@@ -311,7 +440,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                 >
                   {row.name}
                 </span>
-
                 {!taskIsPublic && (
                   <span
                     title={
@@ -445,7 +573,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
               >
                 {(provided) => (
                   <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {/* group header */}
                     <div className="flex items-center gap-2.5 mb-2 px-1">
                       <span
                         className="h-2.5 w-2.5 rounded-full flex-shrink-0"
@@ -459,9 +586,7 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                       </span>
                     </div>
 
-                    {/* table */}
                     <div className="rounded-2xl border border-stone-100 bg-white overflow-visible shadow-sm">
-                      {/* header */}
                       <div
                         className="grid items-center border-b border-stone-50 bg-stone-50/80 px-3 py-2 rounded-t-2xl"
                         style={{ gridTemplateColumns: GRID_COLS }}
@@ -476,7 +601,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                         ))}
                       </div>
 
-                      {/* task rows */}
                       <div className="divide-y divide-stone-50">
                         {group.tasks.length === 0 &&
                           openInlineStatusId !== group.status.id && (
@@ -510,7 +634,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                         )}
                       </div>
 
-                      {/* inline create row */}
                       {openInlineStatusId === group.status.id && (
                         <InlineCreateRow
                           statusId={group.status.id}
@@ -526,7 +649,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                         />
                       )}
 
-                      {/* add task button */}
                       <button
                         onClick={() => setOpenInlineStatusId(group.status.id)}
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-[12px] font-medium text-stone-400 hover:text-indigo-500 hover:bg-indigo-50/40 transition-colors border-t border-stone-50 rounded-b-2xl"
@@ -556,7 +678,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
         </DragDropContext>
       )}
 
-      {/* bulk action bar */}
       {checkedIds.size > 0 && (
         <>
           <BulkStatusModal
@@ -671,7 +792,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
         onConfirm={handleBulkDelete}
       />
 
-      {/* detail drawer */}
       {selected && (
         <DetailTask
           task={selected}

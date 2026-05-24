@@ -1,11 +1,16 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 import { useParams } from "react-router-dom";
 import { Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
 import { Category } from "../../types/category";
 import { List } from "../../types/list";
-import { priorityBadge, priorityColor, WEEKDAYS } from "../../constants";
+import {
+  BASE_URL,
+  priorityBadge,
+  priorityColor,
+  WEEKDAYS,
+} from "../../constants";
 import { callDeleteTask, callUpdateTask } from "../../services/task";
 import { callGetCategories } from "../../services/category";
 import { callGetStatuses } from "../../services/status";
@@ -24,6 +29,7 @@ import { InlineDayEdit } from "../tools/InlineDayEdit";
 import NotFound from "../ui/NotFound";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { io } from "socket.io-client";
 
 interface ListFlat extends List {
   categoryName: string;
@@ -65,7 +71,7 @@ const SpaceCalendarView: React.FC = () => {
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-
+  const membersRef = useRef<Member[]>([]);
   const [dragId, setDragId] = useState<number | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -122,6 +128,95 @@ const SpaceCalendarView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!user) return;
+    const socket = io(BASE_URL.replace("/api", ""), {
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      socket.emit("join", { userId: user.id });
+    });
+
+    socket.on("task:created", async (data: { taskId: number }) => {
+      try {
+        const res = await callGetCategories(Number(spaceId));
+        const allTasks: Task[] = (res.data as Category[]).flatMap((cat) =>
+          (cat.lists ?? []).flatMap((list) => (list as any).tasks ?? []),
+        );
+        const newTask = allTasks.find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setTasks((prev) => [...prev, newTask]);
+      } catch {}
+    });
+
+    socket.on("task:updated", (data: { task: Task }) => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === data.task.id
+            ? { ...t, ...data.task, assignees: t.assignees }
+            : t,
+        ),
+      );
+      setSelected((prev) =>
+        prev?.id === data.task.id
+          ? { ...prev, ...data.task, assignees: prev.assignees }
+          : prev,
+      );
+    });
+
+    socket.on("task:deleted", (data: { taskId: number; taskName: string }) => {
+      setTasks((prev) => prev.filter((t) => t.id !== data.taskId));
+      setSelected((prev) => (prev?.id === data.taskId ? null : prev));
+      toastSuccess(`Task "${data.taskName}" was deleted.`);
+    });
+
+    socket.on(
+      "task:assignee:changed",
+      (data: {
+        taskId: number;
+        addedAssignees: number[];
+        removedAssignees: number[];
+      }) => {
+        const currentMembers = membersRef.current;
+        const updateAssignees = (assignees: Member[] = []) => {
+          const afterRemove = assignees.filter(
+            (a) => !data.removedAssignees.includes(a.id),
+          );
+          const toAdd = currentMembers.filter((m) =>
+            data.addedAssignees.includes(m.id),
+          );
+          return [
+            ...afterRemove,
+            ...toAdd.filter(
+              (m: Member) => !afterRemove.some((a) => a.id === m.id),
+            ),
+          ];
+        };
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === data.taskId
+              ? { ...t, assignees: updateAssignees(t.assignees) }
+              : t,
+          ),
+        );
+        setSelected((prev) =>
+          prev?.id === data.taskId
+            ? { ...prev, assignees: updateAssignees(prev.assignees) }
+            : prev,
+        );
+      },
+    );
+
+    return () => {
+      socket.emit("leave", { userId: user.id });
+      socket.disconnect();
+    };
+  }, [user?.id, spaceId]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;

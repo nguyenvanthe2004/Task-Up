@@ -4,6 +4,7 @@ import React, {
   useEffect,
   forwardRef,
   useImperativeHandle,
+  useRef,
 } from "react";
 import { useParams } from "react-router-dom";
 import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
@@ -26,6 +27,8 @@ import { InlineCreateCard } from "../tools/InlineCreateCard";
 import { InlineEditCard } from "../tools/InlineEditCard";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { BASE_URL } from "../../constants";
+import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
@@ -61,6 +64,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const membersRef = useRef<Member[]>([]);
 
   const [dragging, setDragging] = useState<{
     taskId: number;
@@ -112,6 +116,134 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    const socket = io(BASE_URL.replace("/api", ""), {
+      withCredentials: true,
+    });
+    socket.on("connect", () => {
+      socket.emit("join", { userId: user.id });
+    });
+
+    socket.on("task:created", async (data: { taskId: number }) => {
+      try {
+        const res = await callGetTasks(Number(listId));
+        const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.status.id === newTask.statusId
+              ? { ...g, tasks: [...g.tasks, newTask] }
+              : g,
+          ),
+        );
+      } catch {}
+    });
+
+    socket.on("task:updated", (data: { task: Task }) => {
+      setGroups((prev) => {
+        let moved: Task | undefined;
+        const without = prev.map((g) => {
+          const found = g.tasks.find((t) => t.id === data.task.id);
+          if (!found) return g;
+          moved = {
+            ...found,
+            ...data.task,
+            assignees: data.task.assignees ?? found.assignees, // giữ assignees cũ nếu không có
+          };
+          return { ...g, tasks: g.tasks.filter((t) => t.id !== data.task.id) };
+        });
+        if (!moved) return prev;
+        return without.map((g) =>
+          g.status.id === moved!.statusId
+            ? { ...g, tasks: [...g.tasks, moved!] }
+            : g,
+        );
+      });
+      setSelectedTask((prev) =>
+        prev?.id === data.task.id
+          ? {
+              ...prev,
+              ...data.task,
+              assignees: data.task.assignees ?? prev.assignees,
+            }
+          : prev,
+      );
+    });
+
+    socket.on("task:deleted", (data: { taskId: number; taskName: string }) => {
+      console.log("task:deleted:", JSON.stringify(data, null, 2));
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          tasks: g.tasks.filter((t) => t.id !== data.taskId),
+        })),
+      );
+      setSelectedTask((prev) => (prev?.id === data.taskId ? null : prev));
+    });
+
+    socket.on(
+      "task:assignee:changed",
+      (data: {
+        taskId: number;
+        addedAssignees: number[];
+        removedAssignees: number[];
+      }) => {
+        const currentMembers = membersRef.current;
+        setGroups((prev) =>
+          prev.map((g) => ({
+            ...g,
+            tasks: g.tasks.map((t) => {
+              if (t.id !== data.taskId) return t;
+              const currentAssignees = t.assignees ?? [];
+              const afterRemove = currentAssignees.filter(
+                (a) => !data.removedAssignees.includes(a.id),
+              );
+              const toAdd = currentMembers.filter((m: Member) =>
+                data.addedAssignees.includes(m.id),
+              );
+              const newAssignees = [
+                ...afterRemove,
+                ...toAdd.filter(
+                  (m: Member) => !afterRemove.some((a) => a.id === m.id),
+                ),
+              ];
+              return { ...t, assignees: newAssignees };
+            }),
+          })),
+        );
+        setSelectedTask((prev) => {
+          if (prev?.id !== data.taskId) return prev;
+          const currentAssignees = prev.assignees ?? [];
+          const afterRemove = currentAssignees.filter(
+            (a) => !data.removedAssignees.includes(a.id),
+          );
+          const toAdd = currentMembers.filter((m: Member) =>
+            data.addedAssignees.includes(m.id),
+          );
+          const newAssignees = [
+            ...afterRemove,
+            ...toAdd.filter(
+              (m: Member) => !afterRemove.some((a) => a.id === m.id),
+            ),
+          ];
+          return { ...prev, assignees: newAssignees };
+        });
+      },
+    );
+
+    return () => {
+      socket.emit("leave", { userId: user.id });
+      socket.disconnect();
+    };
+  }, [user?.id, fetchData]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;

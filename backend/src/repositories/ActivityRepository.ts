@@ -49,7 +49,7 @@ export class ActivityRepository {
           ],
         },
       ],
-      order: [["createdAt", "ASC"]],
+      order: [["createdAt", "DESC"]],
     });
   }
 

@@ -30,81 +30,91 @@ export class CommentService {
 
   async findById(id: number) {
     const comment = await this.commentRepo.findById(id);
-    if (!comment) {
-      throw new NotFoundError("Comment not found");
-    }
+    if (!comment) throw new NotFoundError("Comment not found");
     return comment.get({ plain: true });
   }
 
   async create(data: CreateCommentInput, user: UserProps) {
-    const task = await this.taskRepo.findById(data.taskId);
-    if (!task) throw new NotFoundError("Task not found");
+  const task = await this.taskRepo.findById(data.taskId);
+  if (!task) throw new NotFoundError("Task not found");
 
-    const comment = await this.commentRepo.create(user.id, data);
-    await this.activityService.logCommentAdded(data.taskId, user);
-    await this.notificationService.notifyTaskAssigneesWithReference(
-      data.taskId,
-      user,
-      "comment",
-      "New comment",
-      `${user.fullName} added a comment to task`,
-      comment.id,
-    );
+  const comment = await this.commentRepo.create(user.id, data);
+  await this.activityService.logCommentAdded(data.taskId, user);
+  await this.notificationService.notifyTaskAssigneesWithReference(
+    data.taskId, user, "comment", "New comment",
+    `${user.fullName} added a comment to task`, comment!.id,
+  );
 
-    const recipients = task.assignees?.map((assignee: any) => assignee.id) ?? [];
-    if (recipients.length > 0) {
-      this.socketService.emitCommentCreated(recipients, comment.get({ plain: true }));
-    }
+  const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
+  const recipients = Array.from(new Set([...assigneeIds, user.id]));
 
-    return comment;
+  const plain = comment!.get({ plain: true });
+  const payload = {
+    ...plain,
+    user: {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      avatar: user.avatar,
+    },
+  };
+
+  if (recipients.length > 0) {
+    this.socketService.emitCommentCreated(recipients, payload);
   }
+
+  return comment;
+}
 
   async update(id: number, data: UpdateCommentInput, user: UserProps) {
-    const comment = await this.commentRepo.findById(id);
-    if (!comment) throw new NotFoundError("Comment not found");
+  const comment = await this.commentRepo.findById(id);
+  if (!comment) throw new NotFoundError("Comment not found");
 
-    if (comment.userId !== user.id)
-      throw new BadRequestError("You can only edit your own comments");
+  const task = await this.taskRepo.findById(comment.taskId);
+  const ownerId = (task as any)?.list?.category?.space?.workspace?.ownerId;
+  const isOwner = ownerId === user.id;
 
-    const updatedComment = await this.commentRepo.update(id, user.id, data);
-    const task = await this.taskRepo.findById(comment.taskId);
-    const recipients = task?.assignees?.map((assignee: any) => assignee.id) ?? [];
+  if (comment.userId !== user.id && !isOwner)
+    throw new BadRequestError("You can only edit your own comments");
 
-    if (recipients.length > 0) {
-      this.socketService.emitCommentUpdated(recipients, updatedComment.get({ plain: true }));
-    }
+  const updatedComment = await this.commentRepo.update(id, user.id, data);
+  const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
+  const recipients = Array.from(new Set([...assigneeIds, user.id]));
 
-    return updatedComment;
+  if (recipients.length > 0) {
+    this.socketService.emitCommentUpdated(recipients, updatedComment!.get({ plain: true }));
   }
 
-  async delete(id: number, user: UserProps) {
-    const comment = await this.commentRepo.findById(id);
-    if (!comment) throw new NotFoundError("Comment not found");
+  return updatedComment;
+}
 
-    if (comment.userId !== user.id)
-      throw new BadRequestError("You can only delete your own comments");
+async delete(id: number, user: UserProps) {
+  const comment = await this.commentRepo.findById(id);
+  if (!comment) throw new NotFoundError("Comment not found");
 
-    const task = await this.taskRepo.findById(comment.taskId);
-    await this.commentRepo.delete(id);
-    await this.activityService.logCommentDeleted(comment.taskId, user);
-    await this.notificationService.notifyTaskAssigneesWithReference(
-      comment.taskId,
-      user,
-      "comment",
-      "Comment removed",
-      `${user.fullName} deleted a comment on task`,
-      comment.id,
-    );
+  const task = await this.taskRepo.findById(comment.taskId);
+  const ownerId = (task as any)?.list?.category?.space?.workspace?.ownerId;
+  const isOwner = ownerId === user.id;
 
-    const recipients = task?.assignees?.map((assignee: any) => assignee.id) ?? [];
-    if (recipients.length > 0) {
-      this.socketService.emitCommentDeleted(recipients, {
-        id: comment.id,
-        taskId: comment.taskId,
-        deletedBy: user.id,
-      });
-    }
+  if (comment.userId !== user.id && !isOwner)
+    throw new BadRequestError("You can only delete your own comments");
 
-    return { success: true };
+  const taskId = comment.taskId;
+  const commentId = comment.id;
+
+  await this.commentRepo.delete(id);
+  await this.activityService.logCommentDeleted(taskId, user);
+  await this.notificationService.notifyTaskAssigneesWithReference(
+    taskId, user, "comment", "Comment removed",
+    `${user.fullName} deleted a comment on task`, commentId,
+  );
+
+  const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
+  const recipients = Array.from(new Set([...assigneeIds, user.id]));
+  if (recipients.length > 0) {
+    this.socketService.emitCommentDeleted(recipients, { id: commentId, taskId, deletedBy: user.id });
   }
+
+  return { success: true };
+}
 }

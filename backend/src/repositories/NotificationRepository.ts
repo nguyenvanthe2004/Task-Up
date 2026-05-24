@@ -1,6 +1,6 @@
 import { Service } from "typedi";
 import { Category, List, Space, Task, User, Workspace } from "../models";
-import Notification from "../models/Notification";
+import Notification, { NotificationType } from "../models/Notification";
 import { CreateNotificationInput } from "../types/notification";
 
 @Service()
@@ -73,9 +73,12 @@ export class NotificationRepository {
   }
 
   async create(userId: number, data: CreateNotificationInput) {
-    return await Notification.create({ ...data, userId });
-  }
-
+  return await Notification.create({ 
+    ...data, 
+    userId,
+    type: data.type as NotificationType,
+  });
+}
   async markAsRead(id: number, userId: number) {
     await Notification.update({ isRead: true }, { where: { id, userId } });
     return await this.findById(id, userId);

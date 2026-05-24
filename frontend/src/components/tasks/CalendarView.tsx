@@ -10,7 +10,12 @@ import dayjs from "dayjs";
 import { useParams } from "react-router-dom";
 import { ListViewHandle, Member, Task, UpdateTask } from "../../types/task";
 import { Status } from "../../types/status";
-import { priorityBadge, priorityColor, WEEKDAYS } from "../../constants";
+import {
+  BASE_URL,
+  priorityBadge,
+  priorityColor,
+  WEEKDAYS,
+} from "../../constants";
 import {
   callGetTasks,
   callUpdateTask,
@@ -31,6 +36,7 @@ import { InlineDayEdit } from "../tools/InlineDayEdit";
 import { InlineDayCreate } from "../tools/InlineDayCreate";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
+import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
@@ -47,7 +53,7 @@ const canViewTask = (task: Task, userId: number): boolean => {
 
 const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const { listId, spaceId } = useParams<{ listId: string; spaceId: string }>();
-
+  const membersRef = useRef<Member[]>([]);
   const today = dayjs();
   const [current, setCurrent] = useState(today.date(1));
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -105,6 +111,100 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!user) return;
+    const socket = io(BASE_URL.replace("/api", ""), {
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      socket.emit("join", { userId: user.id });
+    });
+
+    socket.on("task:created", async (data: { taskId: number }) => {
+      try {
+        const res = await callGetTasks(Number(listId));
+        const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setTasks((prev) => [...prev, newTask]);
+      } catch {}
+    });
+
+    socket.on("task:updated", (data: { task: Task }) => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === data.task.id
+            ? {
+                ...t,
+                ...data.task,
+                assignees: data.task.assignees ?? t.assignees,
+              }
+            : t,
+        ),
+      );
+      setSelected((prev) =>
+        prev?.id === data.task.id
+          ? {
+              ...prev,
+              ...data.task,
+              assignees: data.task.assignees ?? prev.assignees,
+            }
+          : prev,
+      );
+    });
+
+    socket.on("task:deleted", (data: { taskId: number; taskName: string }) => {
+      setTasks((prev) => prev.filter((t) => t.id !== data.taskId));
+      setSelected((prev) => (prev?.id === data.taskId ? null : prev));
+      toastSuccess(`Task "${data.taskName}" was deleted.`);
+    });
+
+    socket.on(
+      "task:assignee:changed",
+      (data: {
+        taskId: number;
+        addedAssignees: number[];
+        removedAssignees: number[];
+      }) => {
+        const currentMembers = membersRef.current;
+        const updateAssignees = (assignees: Member[] = []) => {
+          const afterRemove = assignees.filter(
+            (a) => !data.removedAssignees.includes(a.id),
+          );
+          const toAdd = currentMembers.filter((m) =>
+            data.addedAssignees.includes(m.id),
+          );
+          return [
+            ...afterRemove,
+            ...toAdd.filter((m) => !afterRemove.some((a) => a.id === m.id)),
+          ];
+        };
+
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === data.taskId
+              ? { ...t, assignees: updateAssignees(t.assignees) }
+              : t,
+          ),
+        );
+        setSelected((prev) =>
+          prev?.id === data.taskId
+            ? { ...prev, assignees: updateAssignees(prev.assignees) }
+            : prev,
+        );
+      },
+    );
+
+    return () => {
+      socket.emit("leave", { userId: user.id });
+      socket.disconnect();
+    };
+  }, [user?.id, listId]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;

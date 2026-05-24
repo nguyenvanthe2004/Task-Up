@@ -3,15 +3,31 @@ import { getIO, getUserRoom } from "../lib/socket";
 
 @Service()
 export class SocketService {
+  private safeEmit(fn: () => void) {
+    try {
+      fn();
+    } catch (err) {
+      console.error("[SocketService] emit failed:", err);
+    }
+  }
+
   emitToUser(userId: number, event: string, payload: unknown) {
-    const io = getIO();
-    io.to(getUserRoom(userId)).emit(event, payload);
+    this.safeEmit(() => {
+      const io = getIO();
+      const room = getUserRoom(userId);
+      const sockets = io.sockets.adapter.rooms.get(room);
+      io.to(room).emit(event, payload);
+    });
   }
 
   emitToUsers(userIds: number[], event: string, payload: unknown) {
-    const io = getIO();
-    userIds.forEach((userId) => {
-      io.to(getUserRoom(userId)).emit(event, payload);
+    this.safeEmit(() => {
+      const io = getIO();
+      userIds.forEach((userId) => {
+        const room = getUserRoom(userId);
+        const sockets = io.sockets.adapter.rooms.get(room);
+        io.to(room).emit(event, payload);
+      });
     });
   }
 
