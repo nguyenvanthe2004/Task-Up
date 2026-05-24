@@ -1,20 +1,17 @@
 import { Service } from "typedi";
 import { Category, List, Space, Task, User, Workspace } from "../models";
-import Activity from "../models/Activity";
-import { CreateActivityInput, UpdateActivityInput } from "../types/activityLog";
+import Notification, { NotificationType } from "../models/Notification";
+import { CreateNotificationInput } from "../types/notification";
 
 @Service()
-export class ActivityRepository {
-  async findAll(taskId?: number) {
-    const whereClause = taskId !== undefined ? { taskId } : {};
-    return await Activity.findAll({
-      where: whereClause,
+export class NotificationRepository {
+  async findAll(userId: number, isRead?: boolean) {
+    return await Notification.findAll({
+      where: {
+        userId,
+        ...(isRead !== undefined ? { isRead } : {}),
+      },
       include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "fullName", "email", "avatar"],
-        },
         {
           model: Task,
           as: "task",
@@ -53,42 +50,44 @@ export class ActivityRepository {
     });
   }
 
-  async findRecent(userId: number, limit = 5) {
-    return await Activity.findAll({
-      where: { userId },
+  async findById(id: number, userId: number) {
+    return await Notification.findOne({
+      where: { id, userId },
       include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "fullName", "avatar"],
-        },
         {
           model: Task,
           as: "task",
           attributes: ["id", "name"],
         },
       ],
-      order: [["createdAt", "DESC"]],
-      limit,
     });
   }
 
-  async findById(id: number) {
-    return await Activity.findOne({
-      where: { id },
+  async countUnread(userId: number) {
+    return await Notification.count({
+      where: {
+        userId,
+        isRead: false,
+      },
     });
   }
 
-  async create(userId: number, data: CreateActivityInput) {
-    return await Activity.create({ ...data, userId });
+  async create(userId: number, data: CreateNotificationInput) {
+  return await Notification.create({ 
+    ...data, 
+    userId,
+    type: data.type as NotificationType,
+  });
+}
+  async markAsRead(id: number, userId: number) {
+    await Notification.update({ isRead: true }, { where: { id, userId } });
+    return await this.findById(id, userId);
   }
 
-  async update(id: number, userId: number, data: UpdateActivityInput) {
-    await Activity.update({ ...data, userId }, { where: { id } });
-    return await this.findById(id);
-  }
-
-  async delete(id: number) {
-    return await Activity.destroy({ where: { id } });
+  async markAllAsRead(userId: number) {
+    return await Notification.update(
+      { isRead: true },
+      { where: { userId, isRead: false } },
+    );
   }
 }

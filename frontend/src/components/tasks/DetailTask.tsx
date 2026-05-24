@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
 import { DetailTaskProps } from "../../types/task";
-import { priorityBadge, priorityColor } from "../../constants";
+import { priorityBadge, priorityColor, BASE_URL } from "../../constants";
 import { AvatarStack } from "../ui/AvatarStack";
 import { Comment } from "../../types/comment";
 import { Attachment } from "../../types/attachment";
@@ -34,6 +34,7 @@ import { RootState } from "../../redux/store";
 import { Pencil, Trash2 } from "lucide-react";
 import { Activity } from "../../types/activity";
 import { callGetActivities } from "../../services/activity";
+import { io, Socket } from "socket.io-client";
 
 const DetailTask: React.FC<DetailTaskProps> = ({
   task,
@@ -55,18 +56,19 @@ const DetailTask: React.FC<DetailTaskProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [loading, setLoading] = useState(false);
-
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(
     null,
   );
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const status =
     statuses.find((s) => s.id === task.statusId) ?? task.status?.[0] ?? null;
   const priority = task.priority ?? null;
-
-  const currentUser = useSelector((state: RootState) => state?.auth.currentUser);
+  const currentUser = useSelector(
+    (state: RootState) => state?.auth.currentUser,
+  );
 
   const {
     register: registerCreate,
@@ -116,6 +118,78 @@ const DetailTask: React.FC<DetailTaskProps> = ({
     }
   };
 
+  useEffect(() => {
+    Promise.all([fetchComments(), fetchActivities(), fetchAttachments()]).catch(
+      console.error,
+    );
+  }, [task.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const socket = io(BASE_URL.replace("/api", ""), { withCredentials: true });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join", { userId: currentUser.id });
+    });
+
+    socket.on("comment:created", (data: Comment) => {
+      if (data.taskId !== task.id) return;
+      setComments((prev) => {
+        if (prev.some((c) => c.id === data.id)) return prev;
+        return [...prev, data];
+      });
+    });
+
+    socket.on("comment:updated", (data: Comment) => {
+      if (data.taskId !== task.id) return;
+      setComments((prev) =>
+        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c)),
+      );
+    });
+
+    socket.on("comment:deleted", (data: { id: number; taskId: number }) => {
+      if (data.taskId !== task.id) return;
+      setComments((prev) => prev.filter((c) => c.id !== data.id));
+    });
+
+    socket.on("activity:new", (data: Activity) => {
+      if (data.taskId !== task.id) return;
+      setActivities((prev) => {
+        if (prev.some((a) => a.id === data.id)) return prev;
+        return [...prev, data];
+      });
+    });
+
+    socket.on("attachment:created", (data: Attachment) => {
+      if (data.taskId !== task.id) return;
+      setAttachments((prev) => {
+        if (prev.some((a) => a.id === data.id)) return prev;
+        return [...prev, data];
+      });
+    });
+
+    socket.on("attachment:deleted", (data: { id: number; taskId: number }) => {
+      if (data.taskId !== task.id) return;
+      setAttachments((prev) => prev.filter((a) => a.id !== data.id));
+    });
+
+    return () => {
+      socket.emit("leave", { userId: currentUser.id });
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUser?.id, task.id]);
+
+  useEffect(() => {
+    if (editingCommentId !== null && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+      const len = editTextareaRef.current.value.length;
+      editTextareaRef.current.setSelectionRange(len, len);
+    }
+  }, [editingCommentId]);
+
   const handleUploadAttachments = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -146,39 +220,10 @@ const DetailTask: React.FC<DetailTaskProps> = ({
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        await Promise.all([
-          fetchComments(),
-          fetchActivities(),
-          fetchAttachments(),
-        ]);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    fetchData();
-  }, [task.id]);
-
-  useEffect(() => {
-    if (editingCommentId !== null && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      const len = editTextareaRef.current.value.length;
-      editTextareaRef.current.setSelectionRange(len, len);
-    }
-  }, [editingCommentId]);
-
   const onSubmitCreate = async (data: CreateCommentFormData) => {
     try {
       setLoading(true);
-      const res = await callCreateComment({ ...data, taskId: task.id });
-      const newComment: Comment = {
-        ...res.data.dataValues,
-        user: currentUser,
-      };
-      setComments((prev) => [...prev, newComment]);
+      await callCreateComment({ ...data, taskId: task.id });
       resetCreate({ content: "", taskId: task.id });
     } catch (error: any) {
       toastError(error.message);
@@ -516,7 +561,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                           </div>
                         )}
                       </a>
-
                       <a
                         href={att.fileUrl}
                         target="_blank"
@@ -528,7 +572,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                         </p>
                         <p className="text-[11px] text-stone-400">{att.type}</p>
                       </a>
-
                       <button
                         onClick={() => handleDeleteAttachment(att.id)}
                         disabled={isDeleting}
@@ -551,7 +594,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
             )}
           </section>
 
-          {/* ── Activity ── */}
           <section className="mb-0">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">
@@ -573,6 +615,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                 ))}
               </div>
             </div>
+
             {(activeTab === "all" || activeTab === "comments") && (
               <div className="flex flex-col gap-1">
                 {comments.length === 0 && (
@@ -580,7 +623,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                     No comments yet. Be the first to comment!
                   </p>
                 )}
-
                 {comments.map((c) => {
                   const isOwn = currentUser?.id === c.user?.id;
                   return (
@@ -678,12 +720,7 @@ const DetailTask: React.FC<DetailTaskProps> = ({
                           </form>
                         ) : (
                           <p
-                            className={`rounded-b-xl px-3.5 py-2.5 text-[13px] leading-relaxed border border-stone-200
-                              ${
-                                isOwn
-                                  ? "rounded-tl-xl bg-stone-800 text-white border-stone-700"
-                                  : "rounded-tr-xl bg-white text-stone-500"
-                              }`}
+                            className={`rounded-b-xl px-3.5 py-2.5 text-[13px] leading-relaxed border border-stone-200 ${isOwn ? "rounded-tl-xl bg-stone-800 text-white border-stone-700" : "rounded-tr-xl bg-white text-stone-500"}`}
                           >
                             {c.content}
                           </p>

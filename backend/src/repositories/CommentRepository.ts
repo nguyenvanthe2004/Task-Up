@@ -13,7 +13,6 @@ export class CommentRepository {
           model: User,
           as: "user",
           attributes: ["id", "fullName", "email", "avatar"],
-          
         },
       ],
       order: [["createdAt", "ASC"]],
@@ -27,8 +26,8 @@ export class CommentRepository {
   }
 
   async create(userId: number, data: CreateCommentInput) {
-    return await Comment.create({ ...data, userId });
-  }
+  return await Comment.create({ ...data, userId });
+}
 
   async update(id: number, userId: number, data: UpdateCommentInput) {
     await Comment.update({ ...data, userId }, { where: { id } });

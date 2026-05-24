@@ -11,6 +11,7 @@ import TaskAssignee from "./TaskAssignee";
 import Comment from "./Comment";
 import Activity from "./Activity";
 import Attachment from "./Attachment";
+import Notification from "./Notification";
 
 const initModels = () => {
   User.belongsToMany(Workspace, {
@@ -211,6 +212,24 @@ const initModels = () => {
     foreignKey: "uploadedBy",
     as: "uploader",
   });
+
+  User.hasMany(Notification, {
+    foreignKey: "userId",
+    as: "notifications",
+  });
+  Notification.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user",
+  });
+
+  Task.hasMany(Notification, {
+    foreignKey: "taskId",
+    as: "notifications",
+  });
+  Notification.belongsTo(Task, {
+    foreignKey: "taskId",
+    as: "task",
+  });
 };
 
 export {
@@ -226,6 +245,7 @@ export {
   TaskAssignee,
   Comment,
   Activity,
-  Attachment
+  Attachment,
+  Notification,
 };
 export default initModels;

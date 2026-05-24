@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import "dotenv/config";
 import express from "express";
+import { createServer } from "http";
 import { Action, useContainer, useExpressServer } from "routing-controllers";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
@@ -26,6 +27,8 @@ import { TaskController } from "./controllers/TaskController";
 import { CommentController } from "./controllers/CommentController";
 import { ActivityController } from "./controllers/ActivityController";
 import { AttachmentController } from "./controllers/AttachmentController";
+import { NotificationController } from "./controllers/NotificationController";
+import { initSocket } from "./lib/socket";
 
 dotenv.config();
 
@@ -47,7 +50,7 @@ export const startServer = async () => {
     app.use(mongooseSerializer);
 
     useExpressServer(app, {
-      controllers: [UserController, FileController, WorkspaceController, SpaceController, CategoryController, ListController, TaskController, StatusController, CommentController, ActivityController, AttachmentController],
+      controllers: [UserController, FileController, WorkspaceController, SpaceController, CategoryController, ListController, TaskController, StatusController, CommentController, ActivityController, AttachmentController, NotificationController],
 
       middlewares: [ErrorHandler, AuthMiddleware],
 
@@ -71,8 +74,10 @@ export const startServer = async () => {
     });
 
     const port = process.env.PORT || 4000;
+    const server = createServer(app);
+    initSocket(server);
 
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`🚀 Server running at http://localhost:${port}`);
     });
   } catch (error) {
