@@ -161,6 +161,58 @@ export class TaskRepository {
     });
   }
 
+  async search(query: string, listId?: number, statusId?: number) {
+    const whereClause: any = {
+      name: { [Op.like]: `%${query}%` },
+      ...(listId !== undefined && { listId }),
+      ...(statusId !== undefined && { statusId }),
+    };
+
+    return await Task.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: "assignees",
+          attributes: ["id", "fullName", "email", "avatar"],
+          through: { attributes: [] },
+        },
+        {
+          model: Status,
+          as: "status",
+          attributes: ["id", "name", "color"],
+        },
+        {
+          model: List,
+          as: "list",
+          attributes: ["id", "name"],
+          include: [
+            {
+              model: Category,
+              as: "category",
+              attributes: ["id", "name"],
+              include: [
+                {
+                  model: Space,
+                  as: "space",
+                  attributes: ["id", "name"],
+                  include: [
+                    {
+                      model: Workspace,
+                      as: "workspace",
+                      attributes: ["id", "name", "ownerId"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+  }
+
   async create(listId: number, statusId: number, data: CreateTask) {
     const { assignees, startDate, dueDate, isPublic, ...taskData } = data;
 

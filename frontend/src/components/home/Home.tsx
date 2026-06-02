@@ -12,12 +12,14 @@ import { Workspace } from "../../types/workspace";
 import LoadingPage from "../ui/LoadingPage";
 import CreateWorkspaceModal from "../workspaces/CreateWorkspaceModal";
 import QuickAccess from "./QuickAccess";
-import TaskList from "./TaskList";
 import StatsPanel from "./Statspanel";
 import { Attachment } from "../../types/attachment";
 import { isToday } from "../../lib/until";
 import { callGetAttachments } from "../../services/attachment";
 import { FileText, Inbox } from "lucide-react";
+import { callGetLatestNotifications } from "../../services/notifications";
+import NotificationList from "./NotificationList";
+import { Notification } from "../../types/notification";
 
 const Home: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -26,6 +28,7 @@ const Home: React.FC = () => {
   const [summary, setSummary] = useState<TaskSummary | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCreate, setOpenCreate] = useState(true);
   const navigate = useNavigate();
@@ -50,13 +53,14 @@ const Home: React.FC = () => {
     const fetchWorkspaceData = async () => {
       setLoading(true);
       try {
-        const [taskRes, summaryRes, actRes, atmRes, spaceRes] =
+        const [taskRes, summaryRes, actRes, atmRes, spaceRes, notiRes] =
           await Promise.allSettled([
             callGetTaskByUser(user.id),
             callGetTaskSummary(),
             callGetActivities(),
             callGetAttachments(),
             callGetSpaces(Number(workspaceId)),
+            callGetLatestNotifications(Number(workspaceId)),
           ]);
 
         const allSpaces: Space[] =
@@ -152,6 +156,13 @@ const Home: React.FC = () => {
         } else {
           setAttachments([]);
         }
+
+        if (notiRes.status === "fulfilled") {
+          console.log("Notifications:", notiRes.value.data);
+          setNotifications(notiRes.value.data ?? []);
+        } else {
+          setNotifications([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -176,7 +187,6 @@ const Home: React.FC = () => {
     );
   }
 
-  const todayTasks = tasks.filter((t) => isToday(t.dueDate));
   const isEmpty =
     tasks.length === 0 && spaces.length === 0 && activities.length === 0;
 
@@ -254,13 +264,7 @@ const Home: React.FC = () => {
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
                 <div className="xl:col-span-8 space-y-6 lg:space-y-8">
                   <QuickAccess spaces={spaces} />
-                  <TaskList
-                    todayTasks={todayTasks}
-                    allTasks={tasks}
-                    dueToday={summary?.dueToday}
-                    workspaces={workspaces}
-                    spaces={spaces}
-                  />
+                  <NotificationList notifications={notifications} />
                 </div>
                 <div className="xl:col-span-4 space-y-4">
                   <StatsPanel

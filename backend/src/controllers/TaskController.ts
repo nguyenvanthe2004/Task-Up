@@ -42,6 +42,16 @@ export class TaskController {
     return await this.taskService.getSummary(user);
   }
 
+  @Get("/search")
+  async searchTasks(
+    @CurrentUser() user: UserProps,
+    @QueryParam("q", { required: true }) q: string,
+    @QueryParam("listId") listId?: number,
+    @QueryParam("statusId") statusId?: number,
+  ) {
+    return this.taskService.search(q, user, listId, statusId);
+  }
+
   @Get("/:id")
   async findById(@Param("id") id: number) {
     return await this.taskService.findById(id);

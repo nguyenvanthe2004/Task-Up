@@ -199,7 +199,6 @@ const DetailTask: React.FC<DetailTaskProps> = ({
       setUploadingAttachment(true);
       await callUploadAttachments(task.id, files);
       await fetchAttachments();
-      toastSuccess("Uploaded successfully");
     } catch (error: any) {
       toastError(error.message);
     } finally {

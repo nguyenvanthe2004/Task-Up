@@ -63,6 +63,44 @@ export class NotificationRepository {
     });
   }
 
+  async findLatest(userId: number, workspaceId: number, isRead?: boolean) {
+    return await Notification.findAll({
+      where: {
+        userId,
+        ...(isRead !== undefined ? { isRead } : {}),
+      },
+      include: [
+        {
+          model: Task,
+          as: "task",
+          include: [
+            {
+              model: List,
+              as: "list",
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                  include: [
+                    {
+                      model: Space,
+                      as: "space",
+                      where: {
+                        workspaceId,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: 5,
+    });
+  }
+
   async countUnread(userId: number) {
     return await Notification.count({
       where: {
@@ -73,12 +111,12 @@ export class NotificationRepository {
   }
 
   async create(userId: number, data: CreateNotificationInput) {
-  return await Notification.create({ 
-    ...data, 
-    userId,
-    type: data.type as NotificationType,
-  });
-}
+    return await Notification.create({
+      ...data,
+      userId,
+      type: data.type as NotificationType,
+    });
+  }
   async markAsRead(id: number, userId: number) {
     await Notification.update({ isRead: true }, { where: { id, userId } });
     return await this.findById(id, userId);

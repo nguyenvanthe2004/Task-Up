@@ -21,3 +21,14 @@ export const callMarkAsRead = async (id: number) => {
 export const callMarkAllAsRead = async () => {
   return await instance.patch("/notifications/mark-all-read");
 };
+export const callGetLatestNotifications = async (
+  workspaceId: number,
+  isRead?: boolean,
+) => {
+  return await instance.get("/notifications/latest", {
+    params: {
+      workspaceId,
+      ...(isRead !== undefined && { isRead }),
+    },
+  });
+};

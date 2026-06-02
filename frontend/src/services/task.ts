@@ -21,6 +21,19 @@ export const callGetTaskByUser = async (userId: number, statusId?: number) => {
 export const callGetTaskSummary = async () => {
   return await instance.get("/tasks/summary");
 };
+
+export const callSearchTasks = async (
+  query: string,
+  listId?: number,
+  statusId?: number,
+) => {
+  const params: Record<string, string | number> = { q: query };
+  if (listId !== undefined) params.listId = listId;
+  if (statusId !== undefined) params.statusId = statusId;
+
+  return await instance.get("/tasks/search", { params });
+};
+
 export const callGetTaskById = async (id: number) => {
   return await instance.get(`/tasks/${id}`);
 };

@@ -4,7 +4,10 @@ import { UserProps } from "../types/auth";
 import { NotificationRepository } from "../repositories/NotificationRepository";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { SocketService } from "./SocketService";
-import { CreateNotificationInput, NotificationType } from "../types/notification";
+import {
+  CreateNotificationInput,
+  NotificationType,
+} from "../types/notification";
 import { ListRepository } from "../repositories/ListRepository";
 import { CategoryRepository } from "../repositories/CategoryRepository";
 import { SpaceRepository } from "../repositories/SpaceRepository";
@@ -36,9 +39,9 @@ export class NotificationService {
   ) {}
 
   async findAll(user: UserProps, isRead?: boolean) {
-  const notifications = await this.notificationRepo.findAll(user.id);
-  return notifications.map((n) => n.get({ plain: true }));
-}
+    const notifications = await this.notificationRepo.findAll(user.id);
+    return notifications.map((n) => n.get({ plain: true }));
+  }
 
   async getUnreadCount(user: UserProps) {
     return await this.notificationRepo.countUnread(user.id);
@@ -60,8 +63,19 @@ export class NotificationService {
 
   async markAllAsRead(user: UserProps) {
     await this.notificationRepo.markAllAsRead(user.id);
-    this.socketService.emitToUser(user.id, "notification:all-read", { success: true });
+    this.socketService.emitToUser(user.id, "notification:all-read", {
+      success: true,
+    });
     return { success: true };
+  }
+
+  async findLatest(user: UserProps, workspaceId: number, isRead?: boolean) {
+    const notifications = await this.notificationRepo.findLatest(
+      user.id,
+      workspaceId,
+      isRead,
+    );
+    return notifications.map((n) => n.get({ plain: true }));
   }
 
   async create(userId: number, data: CreateNotificationInput) {
@@ -71,14 +85,22 @@ export class NotificationService {
     return notification;
   }
 
-  private async getOwnerIdFromTask(taskId: number): Promise<number | undefined> {
+  private async getOwnerIdFromTask(
+    taskId: number,
+  ): Promise<number | undefined> {
     try {
       const task = await this.taskRepo.findById(taskId);
       if (!task) return undefined;
       const list = await this.listRepo.findById(task.listId);
-      const category = list ? await this.categoryRepo.findById(list.categoryId) : null;
-      const space = category ? await this.spaceRepo.findById(category.spaceId) : null;
-      const workspace = space ? await this.workspaceRepo.findOne(space.workspaceId) : null;
+      const category = list
+        ? await this.categoryRepo.findById(list.categoryId)
+        : null;
+      const space = category
+        ? await this.spaceRepo.findById(category.spaceId)
+        : null;
+      const workspace = space
+        ? await this.workspaceRepo.findOne(space.workspaceId)
+        : null;
       return workspace?.dataValues?.ownerId;
     } catch {
       return undefined;
@@ -100,10 +122,9 @@ export class NotificationService {
         ?.filter((a: any) => a.id !== user.id)
         .map((a: any) => a.id) ?? [];
 
-    const recipients = Array.from(new Set([
-      ...assigneeIds,
-      ...(ownerId ? [ownerId] : []),
-    ]));
+    const recipients = Array.from(
+      new Set([...assigneeIds, ...(ownerId ? [ownerId] : [])]),
+    );
 
     if (recipients.length === 0) return [];
 

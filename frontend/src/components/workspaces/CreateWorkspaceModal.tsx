@@ -126,7 +126,10 @@ export default function CreateWorkspaceModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="max-w-xl max-h-[100vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200
+  "
+      >
         {/* Colored top accent bar */}
         <div
           className="h-1 w-full transition-colors duration-300"

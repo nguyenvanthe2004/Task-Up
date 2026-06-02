@@ -30,6 +30,14 @@ export class NotificationController {
   async getUnreadCount(@CurrentUser() user: UserProps) {
     return await this.notificationService.getUnreadCount(user);
   }
+  @Get("/latest")
+  async findLatest(
+    @CurrentUser() user: UserProps,
+    @QueryParam("workspaceId") workspaceId: number,
+    @QueryParam("isRead") isRead?: boolean,
+  ) {
+    return await this.notificationService.findLatest(user, workspaceId, isRead);
+  }
 
   @Get(":id")
   async findById(@Param("id") id: number, @CurrentUser() user: UserProps) {

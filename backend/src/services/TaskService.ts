@@ -326,4 +326,23 @@ export class TaskService {
 
     return { success: true };
   }
+
+  async search(
+    query: string,
+    user: UserProps,
+    listId?: number,
+    statusId?: number,
+  ) {
+    if (!query || query.trim().length === 0) {
+      throw new BadRequestError("Search query cannot be empty");
+    }
+
+    const tasks: Task[] = await this.taskRepo.search(
+      query.trim(),
+      listId,
+      statusId,
+    );
+
+    return tasks.map((task) => task.get({ plain: true }));
+  }
 }
