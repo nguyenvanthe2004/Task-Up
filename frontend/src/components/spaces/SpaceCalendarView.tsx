@@ -38,14 +38,12 @@ interface ListFlat extends List {
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
-const canViewTask = (task: Task, userId: number): boolean => {
+const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
   if (isTaskPublic(task)) return true;
-
+  if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
   if (ownerId !== undefined && ownerId === userId) return true;
-
   if (task.assignees?.some((a) => a.id === userId)) return true;
-
   return false;
 };
 
@@ -83,6 +81,10 @@ const SpaceCalendarView: React.FC = () => {
   const [activeListId, setActiveListId] = useState<number | null>(null);
 
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const isOwner = user?.workspaces?.some((w) => {
+    const oid = w.ownerId;
+    return (typeof oid === "object" ? oid?.id : oid) === user.id;
+  }) ?? false;
 
   const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
@@ -220,7 +222,7 @@ const SpaceCalendarView: React.FC = () => {
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;
-    if (!canViewTask(task, user.id)) return;
+    if (!canViewTask(task, user.id, isOwner)) return;
     setSelected(task);
   };
 
@@ -367,7 +369,7 @@ const SpaceCalendarView: React.FC = () => {
     const isChecked = checkedIds.has(task.id);
     const list = lists.find((l) => l.id === task.listId);
     const taskIsPublic = isTaskPublic(task);
-    const allowed = user ? canViewTask(task, user.id) : false;
+    const allowed = user ? canViewTask(task, user.id, isOwner) : false;
 
     if (editingTaskId === task.id) {
       return (
@@ -1066,20 +1068,6 @@ const SpaceCalendarView: React.FC = () => {
               <span className="text-xs font-bold text-stone-600">Selected</span>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setBulkStatusOpen(true);
-                  setBulkAssignOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  assignment_turned_in
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Status
-                </span>
-              </button>
               <button
                 onClick={() => {
                   setBulkAssignOpen(true);

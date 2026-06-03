@@ -148,6 +148,16 @@ const SideBar: React.FC = () => {
 
   const workspace = userWorkspaces.find((w) => w.id === Number(workspaceId));
 
+  useEffect(() => {
+  if (!user.id) return; 
+
+  const timer = setTimeout(() => {
+    if (!workspace) setOpen(true);
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [workspace, user.id]);
+
   const ref = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => {

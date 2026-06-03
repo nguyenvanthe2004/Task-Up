@@ -25,14 +25,12 @@ import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
-const canViewTask = (task: Task, userId: number): boolean => {
+const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
   if (isTaskPublic(task)) return true;
-
+  if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
   if (ownerId !== undefined && ownerId === userId) return true;
-
   if (task.assignees?.some((a) => a.id === userId)) return true;
-
   return false;
 };
 
@@ -52,6 +50,10 @@ interface CategoryWithGroups extends Category {
 const SpaceBoardView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const isOwner = user?.workspaces?.some((w) => {
+    const oid = w.ownerId;
+    return (typeof oid === "object" ? oid?.id : oid) === user.id;
+  }) ?? false;
 
   const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
     [],
@@ -290,7 +292,7 @@ const SpaceBoardView: React.FC = () => {
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;
-    if (!canViewTask(task, user.id)) return;
+    if (!canViewTask(task, user.id, isOwner)) return;
     setSelectedTask(task);
   };
 
@@ -620,12 +622,12 @@ const SpaceBoardView: React.FC = () => {
                       {!isTaskPublic(task) && (
                         <span
                           title={
-                            user && canViewTask(task, user.id)
+                            user && canViewTask(task, user.id, isOwner)
                               ? "Private task (you have access)"
                               : "Private task — you don't have access"
                           }
                           className={`material-symbols-outlined absolute top-2 right-2 text-[13px] select-none pointer-events-none ${
-                            user && canViewTask(task, user.id)
+                            user && canViewTask(task, user.id, isOwner)
                               ? "text-stone-300"
                               : "text-amber-400"
                           }`}
@@ -837,20 +839,6 @@ const SpaceBoardView: React.FC = () => {
               <span className="text-xs font-bold text-stone-600">Selected</span>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setBulkStatusOpen(true);
-                  setBulkAssignOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  assignment_turned_in
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Status
-                </span>
-              </button>
               {checkedIds.size === 1 && (
                 <button
                   onClick={() => {

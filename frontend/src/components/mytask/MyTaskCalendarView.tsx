@@ -729,17 +729,6 @@ const MyTaskCalendarView: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setBulkStatusOpen(true)}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  assignment_turned_in
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Status
-                </span>
-              </button>
-              <button
                 onClick={() => setCheckedIds(new Set())}
                 className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-red-400 hover:bg-red-50 transition-colors"
               >

@@ -30,6 +30,7 @@ const Home: React.FC = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [openCreate, setOpenCreate] = useState(true);
   const navigate = useNavigate();
   const { workspaceId } = useParams();
@@ -41,6 +42,7 @@ const Home: React.FC = () => {
         const wsRes = await callGetMyWorkspace();
         setWorkspaces(wsRes.data ?? []);
       } finally {
+        setLoadingWorkspaces(false);
         setLoading(false);
       }
     };
@@ -158,7 +160,6 @@ const Home: React.FC = () => {
         }
 
         if (notiRes.status === "fulfilled") {
-          console.log("Notifications:", notiRes.value.data);
           setNotifications(notiRes.value.data ?? []);
         } else {
           setNotifications([]);
@@ -171,7 +172,7 @@ const Home: React.FC = () => {
     fetchWorkspaceData();
   }, [workspaceId, workspaces.length, user?.id]);
 
-  if (workspaces.length === 0) {
+  if (!loadingWorkspaces && workspaces.length === 0) {
     return (
       <CreateWorkspaceModal
         isOpen={openCreate}

@@ -35,14 +35,12 @@ const isTaskPublic = (task: Task): boolean => {
   return Boolean(task.isPublic);
 };
 
-const canViewTask = (task: Task, userId: number): boolean => {
+const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
   if (isTaskPublic(task)) return true;
-
+  if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
   if (ownerId !== undefined && ownerId === userId) return true;
-
   if (task.assignees?.some((a) => a.id === userId)) return true;
-
   return false;
 };
 interface StatusGroup {
@@ -62,6 +60,10 @@ const SpaceListView: React.FC = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
   const membersRef = useRef<Member[]>([]);
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const isOwner = user?.workspaces?.some((w) => {
+    const oid = w.ownerId;
+    return (typeof oid === "object" ? oid?.id : oid) === user.id;
+  }) ?? false;
 
   const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(
     [],
@@ -288,7 +290,7 @@ const SpaceListView: React.FC = () => {
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;
-    if (!canViewTask(task, user.id)) return;
+    if (!canViewTask(task, user.id, isOwner)) return;
     setSelected(task);
   };
 
@@ -472,7 +474,7 @@ const SpaceListView: React.FC = () => {
       render: (row: Task) => {
         const index = groupTasks.findIndex((t) => t.id === row.id);
         const taskIsPublic = isTaskPublic(row);
-        const allowed = user ? canViewTask(row, user.id) : false;
+        const allowed = user ? canViewTask(row, user.id, isOwner) : false;
 
         return (
           <Draggable draggableId={String(row.id)} index={index} key={row.id}>
@@ -870,20 +872,6 @@ const SpaceListView: React.FC = () => {
               <span className="text-xs font-bold text-stone-600">Selected</span>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setBulkStatusOpen(true);
-                  setBulkAssignOpen(false);
-                }}
-                className="flex flex-col items-center gap-0.5 rounded-xl p-2 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px] text-stone-400">
-                  assignment_turned_in
-                </span>
-                <span className="text-[9px] font-bold uppercase text-stone-400">
-                  Status
-                </span>
-              </button>
               {checkedIds.size === 1 && (
                 <button
                   onClick={() => {

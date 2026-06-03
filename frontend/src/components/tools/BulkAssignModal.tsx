@@ -183,15 +183,22 @@ const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
               Cancel
             </button>
             <button
-              disabled={selectedIds.size === 0}
+              disabled={selectedIds.size === 0 || loading}
               onClick={() => onSelect([...selectedIds])}
               className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-all shadow-sm shadow-indigo-200"
             >
-              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 8h12M9 3l5 5-5 5" />
-              </svg>
-              Assign
-              {selectedIds.size > 0 && (
+              {loading ? (
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 8h12M9 3l5 5-5 5" />
+                </svg>
+              )}
+              {loading ? "Assigning..." : "Assign"}
+              {!loading && selectedIds.size > 0 && (
                 <span className="bg-indigo-400 text-white text-[11px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
                   {selectedIds.size}
                 </span>

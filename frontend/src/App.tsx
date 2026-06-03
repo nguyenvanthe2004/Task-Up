@@ -29,7 +29,6 @@ function App() {
   const fetchCurrentUser = async () => {
     try {
       const res = await callGetCurrentUser();
-      console.log(res.data);
       dispatch(setCurrentUser(res.data));
     } catch {
       dispatch(logout());
