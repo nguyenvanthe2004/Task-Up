@@ -13,6 +13,8 @@ export class UserRepository {
     return await User.findAll({
       offset: skip,
       limit,
+      attributes: { exclude: ["password", "verifyCode"] },
+      order: [["createdAt", "DESC"]],
       raw: true,
     });
   }

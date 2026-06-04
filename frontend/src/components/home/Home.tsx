@@ -37,6 +37,12 @@ const Home: React.FC = () => {
   const user = useSelector((state: any) => state.auth.currentUser);
 
   useEffect(() => {
+    if (!user?.id) {
+      setLoadingWorkspaces(false);
+      setLoading(false);
+      return;
+    }
+
     const fetchWorkspaces = async () => {
       try {
         const wsRes = await callGetMyWorkspace();
@@ -46,11 +52,12 @@ const Home: React.FC = () => {
         setLoading(false);
       }
     };
-    if (user?.id) fetchWorkspaces();
+
+    fetchWorkspaces();
   }, [user?.id]);
 
   useEffect(() => {
-    if (!workspaceId || workspaces.length === 0) return;
+    if (!user?.id || !workspaceId || workspaces.length === 0) return;
 
     const fetchWorkspaceData = async () => {
       setLoading(true);

@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import LandingPage from "./pages/landing/LandingPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -17,19 +17,24 @@ import SpaceMemberPage from "./pages/spaces/SpaceMemberPage";
 import MemberPage from "./pages/workspace/MemberPage";
 import LoadingPage from "./components/ui/LoadingPage";
 import PrivateRoute from "./components/PrivateRoute";
+import AdminRoute from "./components/AdminRoute";
+import WorkspaceRoute from "./components/WorkspaceRoute";
+import UserManager from "./components/admin/users/UserManager";
 import ListDetailPage from "./pages/lists/ListDetailPage";
 import { RootState } from "./redux/store";
+import { isAdminRole, normalizeAuthUser } from "./lib/auth";
 
 function App() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const currentUser = useSelector((state: RootState) => state.auth.currentUser);
-  const isAuthenticated = !!currentUser;
+  const isAuthenticated = Boolean(currentUser?.id);
   const fetchCurrentUser = async () => {
     try {
       const res = await callGetCurrentUser();
-      dispatch(setCurrentUser(res.data));
+      dispatch(setCurrentUser(normalizeAuthUser(res.data)));
     } catch {
       dispatch(logout());
 
@@ -51,6 +56,13 @@ function App() {
     fetchCurrentUser();
   }, [dispatch]);
 
+  useEffect(() => {
+    if (loading || !currentUser?.id) return;
+    if (isAdminRole(currentUser.role) && location.pathname === "/") {
+      navigate("/admin", { replace: true });
+    }
+  }, [loading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
+
   if (loading) return <LoadingPage />;
 
   return (
@@ -60,12 +72,16 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/oauth/github" element={<GithubCallback />} />
 
+      <Route path="/admin" element={<AdminRoute />}>
+        <Route index element={<UserManager />} />
+      </Route>
+
       <Route
         path="/"
         element={<PrivateRoute isAuthenticated={isAuthenticated} />}
       >
         <Route index element={<HomePage />} />
-        <Route path=":workspaceId">
+        <Route path=":workspaceId" element={<WorkspaceRoute />}>
           <Route index element={<HomePage />} />
           <Route path="members" element={<MemberPage />} />
           <Route path="my-tasks" element={<MyTaskPage />} />

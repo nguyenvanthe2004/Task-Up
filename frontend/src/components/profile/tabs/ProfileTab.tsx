@@ -16,6 +16,7 @@ import {
 } from "../../../services/auth";
 import { setCurrentUser } from "../../../redux/slices/currentUser";
 import { toastError, toastSuccess } from "../../../lib/toast";
+import { normalizeAuthUser } from "../../../lib/auth";
 import { CLOUDINARY_URL } from "../../../constants";
 
 const ProfileTab: React.FC = () => {
@@ -63,7 +64,7 @@ const ProfileTab: React.FC = () => {
     try {
       await callUpdateProfile(dto.fullName, dto.phone);
       const res = await callGetCurrentUser();
-      dispatch(setCurrentUser(res.data));
+      dispatch(setCurrentUser(normalizeAuthUser(res.data)));
       toastSuccess("Profile updated successfully");
     } catch {
       toastError("Failed to update profile");

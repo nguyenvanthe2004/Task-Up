@@ -34,6 +34,7 @@ export class UserController {
     private readonly uploadService: UploadService,
   ) {}
 
+  @Authorized(UserRole.ADMIN)
   @Get("/")
   findAll(
     @QueryParam("page") page: number,
@@ -43,8 +44,8 @@ export class UserController {
   }
 
   @Get("/current")
-  async getCurrent(@CurrentUser() user: JwtPayload) {
-    return this.userService.currentUser(user);
+  async getCurrent(@CurrentUser() user: JwtPayload, @Res() res: Response) {
+    return this.userService.currentUser(user, res);
   }
 
   @Get("/:id")
@@ -112,6 +113,18 @@ export class UserController {
   ) {
     return await this.userService.updatePassword(user, dto);
   }
+
+  @Authorized(UserRole.ADMIN)
+  @Put("/:id/role")
+  async updateRole(
+    @Param("id") id: number,
+    @Body() body: { role: UserRole },
+    @CurrentUser() user: UserProps,
+    @Res() res: Response,
+  ) {
+    return this.userService.updateRole(id, body.role, user, res);
+  }
+
   @Post("/logout")
   async logout(@Res() res: Response) {
     return await this.userService.logout(res);

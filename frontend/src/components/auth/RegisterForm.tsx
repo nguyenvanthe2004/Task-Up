@@ -18,6 +18,7 @@ import { toastError, toastSuccess } from "../../lib/toast";
 import { Eye, EyeOff } from "lucide-react";
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
 import { setCurrentUser } from "../../redux/slices/currentUser";
+import { getPostLoginPath, normalizeAuthUser } from "../../lib/auth";
 import { useDispatch } from "react-redux";
 import { YOUR_GITHUB_CLIENT_ID } from "../../constants";
 
@@ -83,15 +84,10 @@ export default function Register() {
       }
 
       const res = await callLoginGoogle(credentialResponse.credential);
-
-      dispatch(setCurrentUser(res.data.user));
+      const user = normalizeAuthUser(res.data.user);
+      dispatch(setCurrentUser(user));
       toastSuccess("Login successfully");
-      const userWorkspaces = res.data.user.workspaces;
-      if (userWorkspaces.length > 0) {
-        navigate(`/${userWorkspaces[0].id}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostLoginPath(user));
     } catch (error: any) {
       toastError(error.message);
     }

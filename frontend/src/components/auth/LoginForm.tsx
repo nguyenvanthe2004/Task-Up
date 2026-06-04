@@ -11,8 +11,7 @@ import { toastError, toastSuccess } from "../../lib/toast";
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
 import { YOUR_GITHUB_CLIENT_ID } from "../../constants";
 import { Eye, EyeOff } from "lucide-react";
-import { Workspace } from "../../types/workspace";
-import { callAcceptInvite } from "../../services/workspace";
+import { getPostLoginPath, normalizeAuthUser } from "../../lib/auth";
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
@@ -55,16 +54,10 @@ const LoginForm: React.FC = () => {
         throw new Error("No credential from Google");
 
       const res = await callLoginGoogle(credentialResponse.credential);
-      
-      dispatch(setCurrentUser(res.data.user));
+      const user = normalizeAuthUser(res.data.user);
+      dispatch(setCurrentUser(user));
       toastSuccess("Login successfully");
-
-      const userWorkspaces = res.data.user.workspaces;
-      if (userWorkspaces.length > 0) {
-        navigate(`/${userWorkspaces[0].id}`);
-      } else {
-        navigate("/");
-      }
+      navigate(getPostLoginPath(user));
     } catch (error: any) {
       toastError(error.message);
     }

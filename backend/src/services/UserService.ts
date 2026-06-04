@@ -293,13 +293,17 @@ export class UserService {
       throw new BadRequestError("Failed to register user");
     }
   }
-  async currentUser(user: JwtPayload) {
+  async currentUser(user: JwtPayload, res?: Response) {
     if (!user) {
       throw new BadRequestError("User not authenticated");
     }
     const findUser = await this.userRepo.findByEmail(user.email);
     if (!findUser) {
       throw new BadRequestError("User not found");
+    }
+
+    if (res) {
+      refreshToken(res, findUser);
     }
 
     const plainUser = findUser.get({ plain: true });
@@ -359,5 +363,29 @@ export class UserService {
   async logout(res: Response) {
     res.clearCookie("token");
     return { message: "Logout successfully" };
+  }
+
+  async updateRole(
+    id: number,
+    role: UserRole,
+    currentUser: UserProps,
+    res?: Response,
+  ) {
+    if (currentUser.id === id && role !== UserRole.ADMIN) {
+      throw new BadRequestError("Cannot demote your own admin role");
+    }
+
+    const user = await this.userRepo.findOne(id);
+    if (!user) throw new BadRequestError("User not found");
+
+    const updated = await this.userRepo.update(id, { role });
+    if (res && currentUser.id === id) {
+      refreshToken(res, updated!);
+    }
+
+    const plainUser = updated!.get({ plain: true });
+    const { password, verifyCode, ...rest } = plainUser;
+
+    return rest;
   }
 }

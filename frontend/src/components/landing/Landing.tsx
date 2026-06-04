@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const Counter: React.FC<{ to: number; suffix?: string }> = ({ to, suffix = "" }) => {
   const [count, setCount] = useState(0);

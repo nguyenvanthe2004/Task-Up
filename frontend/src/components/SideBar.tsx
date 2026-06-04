@@ -149,14 +149,14 @@ const SideBar: React.FC = () => {
   const workspace = userWorkspaces.find((w) => w.id === Number(workspaceId));
 
   useEffect(() => {
-  if (!user.id) return; 
+    if (!user?.id) return;
 
-  const timer = setTimeout(() => {
-    if (!workspace) setOpen(true);
-  }, 300);
+    const timer = setTimeout(() => {
+      if (!workspace) setOpen(true);
+    }, 300);
 
-  return () => clearTimeout(timer);
-}, [workspace, user.id]);
+    return () => clearTimeout(timer);
+  }, [workspace, user?.id]);
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -191,10 +191,13 @@ const SideBar: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!user?.id || !workspaceId) return;
     fetchMember();
-  }, [workspaceId]);
+  }, [workspaceId, user?.id]);
 
   useEffect(() => {
+    if (!user?.id || !workspaceId) return;
+
     let cancelled = false;
 
     const load = async () => {
@@ -213,7 +216,7 @@ const SideBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId]);
+  }, [workspaceId, user?.id]);
 
   const handleCreateSpace = async (data: CreateSpaceFormData) => {
     try {
