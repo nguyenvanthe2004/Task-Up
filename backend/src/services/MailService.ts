@@ -7,11 +7,24 @@ export class MailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS,
       },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+    });
+
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error("SMTP Verify Error:", error);
+      } else {
+        console.log("SMTP Server is ready");
+      }
     });
   }
 
