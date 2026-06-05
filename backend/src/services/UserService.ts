@@ -289,6 +289,7 @@ export class UserService {
         message: "Verification code sent to email",
       };
     } catch (error) {
+      console.log("error", error)
       throw new BadRequestError("Failed to register user");
     }
   }
