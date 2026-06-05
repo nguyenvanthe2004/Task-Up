@@ -76,7 +76,7 @@ export class UserService {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "none",
     });
 
     const { password, verifyCode, ...rest } = plainUser;
