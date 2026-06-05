@@ -9,7 +9,7 @@ import { callLogin, callLoginGoogle } from "../../services/auth";
 import { setCurrentUser } from "../../redux/slices/currentUser";
 import { toastError, toastSuccess } from "../../lib/toast";
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
-import { YOUR_GITHUB_CLIENT_ID } from "../../constants";
+import { FRONTEND_URL, YOUR_GITHUB_CLIENT_ID } from "../../constants";
 import { Eye, EyeOff } from "lucide-react";
 import { getPostLoginPath, normalizeAuthUser } from "../../lib/auth";
 
@@ -124,7 +124,7 @@ const LoginForm: React.FC = () => {
                   return;
                 }
 
-                window.location.href = `https://github.com/login/oauth/authorize?client_id=${YOUR_GITHUB_CLIENT_ID}&redirect_uri=http://localhost:5173/oauth/github&scope=user:email`;
+                window.location.href = `https://github.com/login/oauth/authorize?client_id=${YOUR_GITHUB_CLIENT_ID}&redirect_uri=${FRONTEND_URL}/oauth/github&scope=user:email`;
               }}
               className="h-[41px] rounded-3xl border border-gray-300 flex items-center justify-center gap-2 hover:bg-blue-50 transition"
             >
