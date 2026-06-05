@@ -261,8 +261,6 @@ export class UserService {
   }
 
   async register(dto: CreateUserDto) {
-    const t = await sequelize.transaction();
-
     try {
       const existed = await this.userRepo.findByEmail(dto.email);
       if (existed) {
@@ -283,7 +281,7 @@ export class UserService {
         isActive: false,
       });
 
-      await t.commit();
+      console.log("Start send Email");
 
       await this.mailService.sendVerifyCode(dto.email, verifyCode);
 
@@ -291,7 +289,6 @@ export class UserService {
         message: "Verification code sent to email",
       };
     } catch (error) {
-      await t.rollback();
       throw new BadRequestError("Failed to register user");
     }
   }
