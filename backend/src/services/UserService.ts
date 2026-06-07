@@ -361,7 +361,11 @@ export class UserService {
   }
 
   async logout(res: Response) {
-    res.clearCookie("token");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+    });
     return { message: "Logout successfully" };
   }
 

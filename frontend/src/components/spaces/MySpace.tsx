@@ -93,7 +93,13 @@ const MySpace: React.FC = () => {
     if (!workspaceId) return;
     try {
       const res = await callGetMembers(Number(workspaceId));
-      setAllMembers(res.data.users ?? []);
+      const members: UserWithWorkSpace[] = res.data.users ?? [];
+      // Đảm bảo current user luôn có trong danh sách
+      const hasCurrentUser = members.some((m) => m.id === user?.id);
+      if (!hasCurrentUser && user) {
+        members.push(user as unknown as UserWithWorkSpace);
+      }
+      setAllMembers(members);
     } catch (_) {}
   };
 
@@ -158,6 +164,8 @@ const MySpace: React.FC = () => {
       ...toRemove.map((id) => callRemoveSpaceMember(activeSpace.id, id)),
     ]);
 
+    closeMember();
+
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed) toastError(`${failed} operation(s) failed.`);
     else toastSuccess("Member has been updated!");
@@ -171,7 +179,6 @@ const MySpace: React.FC = () => {
     } catch (error: any) {
       toastError(error.message ?? "Failed to load members.");
     }
-    closeMember();
   };
 
   const renderCard = (space: Space, wide = false) => {
