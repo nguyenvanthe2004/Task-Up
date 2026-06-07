@@ -10,7 +10,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import { useEffect, useState } from "react";
 import { callGetCurrentUser } from "./services/auth";
-import { logout, setCurrentUser } from "./redux/slices/currentUser";
+import { logout, setCurrentUser, setLoggingOut } from "./redux/slices/currentUser";
 import { useDispatch, useSelector } from "react-redux";
 import GithubCallback from "./components/auth/GitHubCallBack";
 import HomePage from "./pages/home/HomePage";
@@ -36,7 +36,9 @@ function App() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const currentUser = useSelector((state: RootState) => state.auth.currentUser);
+  const isLoggingOut = useSelector((state: RootState) => state.auth.isLoggingOut);
   const isAuthenticated = Boolean(currentUser?.id);
+
   const fetchCurrentUser = async () => {
     try {
       const res = await callGetCurrentUser();
@@ -78,13 +80,7 @@ function App() {
     if (isAdminRole(currentUser.role) && location.pathname === "/") {
       navigate("/admin", { replace: true });
     }
-  }, [
-    loading,
-    currentUser?.id,
-    currentUser?.role,
-    location.pathname,
-    navigate,
-  ]);
+  }, [loading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
 
   if (loading) return <LoadingPage />;
 
@@ -104,6 +100,8 @@ function App() {
         element={
           isAuthenticated ? (
             <PrivateRoute isAuthenticated={isAuthenticated} />
+          ) : isLoggingOut ? (
+            <Navigate to="/login" replace />
           ) : (
             <Navigate to="/landing" replace />
           )
@@ -124,7 +122,6 @@ function App() {
           </Route>
 
           <Route path="settings" element={<ProfilePage />} />
-
           <Route path="notifications" element={<NotificationPage />} />
         </Route>
       </Route>

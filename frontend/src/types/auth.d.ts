@@ -31,5 +31,6 @@ export interface UserWithWorkSpace extends User {
 }
 
 export interface CurrentUserState {
+  isLoggingOut: boolean;
   currentUser: User & { workspaces?: Workspace[] };
 }

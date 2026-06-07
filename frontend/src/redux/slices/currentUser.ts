@@ -4,6 +4,7 @@ import type { CurrentUserState, User } from "../../types/auth";
 import { Workspace } from "../../types/workspace";
 
 const initialState: CurrentUserState = {
+  isLoggingOut: false,
   currentUser: {
     id: 0,
     fullName: "",
@@ -23,6 +24,7 @@ export const currentUserSlice = createSlice({
       state.currentUser = action.payload;
     },
     logout: (state) => {
+      state.isLoggingOut = false;
       state.currentUser = {
         id: 0,
         fullName: "",
@@ -31,6 +33,9 @@ export const currentUserSlice = createSlice({
         role: "",
         avatar: "",
       };
+    },
+    setLoggingOut: (state) => {
+      state.isLoggingOut = true;
     },
     addWorkspace: (state, action: PayloadAction<Workspace>) => {
       if (state.currentUser) {
@@ -43,5 +48,5 @@ export const currentUserSlice = createSlice({
   },
 });
 
-export const { setCurrentUser, logout, addWorkspace } = currentUserSlice.actions;
+export const { setCurrentUser, logout, addWorkspace, setLoggingOut } = currentUserSlice.actions;
 export default currentUserSlice.reducer;
