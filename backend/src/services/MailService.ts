@@ -19,7 +19,7 @@ export class MailService {
   async sendVerifyCode(email: string, code: string) {
     try {
       const info = await this.transporter.sendMail({
-        from: `"TaskUp" <${process.env.MAIL_USER}>`,
+        from: `"TaskUp" <${process.env.SENDER_EMAIL}>`,
         to: email,
         subject: "Email verification",
         html: `<h2>Your verification code: ${code}</h2>`,
@@ -37,7 +37,7 @@ export class MailService {
     const currentYear = new Date().getFullYear();
 
     await this.transporter.sendMail({
-      from: `"TaskUp" <${process.env.MAIL_USER}>`,
+      from: `"TaskUp" <${process.env.SENDER_EMAIL}>`,
       to: email,
       subject: "You've been invited to join a workspace on TaskUp",
       html: `
