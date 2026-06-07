@@ -703,7 +703,6 @@ const SpaceListView: React.FC = () => {
                   onClose={() => setOpenInlineKey(null)}
                   onCreated={() => {
                     setOpenInlineKey(null);
-                    fetchData();
                   }}
                 />
               )}

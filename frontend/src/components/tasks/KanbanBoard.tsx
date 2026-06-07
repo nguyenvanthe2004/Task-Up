@@ -259,7 +259,7 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
       socket.emit("leave", { userId: user.id });
       socket.disconnect();
     };
-  }, [user?.id, fetchData]);
+  }, [user?.id]);
 
   const handleTaskClick = (task: Task) => {
     if (!user) return;

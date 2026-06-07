@@ -735,7 +735,6 @@ const SpaceCalendarView: React.FC = () => {
                     onClose={() => setOpenCreateKey(null)}
                     onCreated={() => {
                       setOpenCreateKey(null);
-                      fetchData();
                     }}
                   />
                 )}

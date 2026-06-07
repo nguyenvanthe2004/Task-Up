@@ -571,7 +571,6 @@ const SpaceBoardView: React.FC = () => {
                     onClose={() => setOpenInlineKey(null)}
                     onCreated={() => {
                       setOpenInlineKey(null);
-                      fetchData();
                     }}
                   />
                 )}
