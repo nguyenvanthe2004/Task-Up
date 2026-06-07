@@ -5,7 +5,7 @@ import { CreateNotificationInput } from "../types/notification";
 
 @Service()
 export class NotificationRepository {
-  async findAll(userId: number, isRead?: boolean) {
+  async findAll(userId: number, workspaceId?: number, isRead?: boolean) {
     return await Notification.findAll({
       where: {
         userId,
@@ -15,22 +15,27 @@ export class NotificationRepository {
         {
           model: Task,
           as: "task",
+          required: workspaceId !== undefined,
           attributes: ["id", "name"],
           include: [
             {
               model: List,
               as: "list",
+              required: workspaceId !== undefined,
               attributes: ["id", "name"],
               include: [
                 {
                   model: Category,
                   as: "category",
+                  required: workspaceId !== undefined,
                   attributes: ["id", "name"],
                   include: [
                     {
                       model: Space,
                       as: "space",
+                      required: workspaceId !== undefined,
                       attributes: ["id", "name"],
+                      ...(workspaceId !== undefined && { where: { workspaceId } }),
                       include: [
                         {
                           model: Workspace,
@@ -73,21 +78,23 @@ export class NotificationRepository {
         {
           model: Task,
           as: "task",
+          required: true,
           include: [
             {
               model: List,
               as: "list",
+              required: true,
               include: [
                 {
                   model: Category,
                   as: "category",
+                  required: true,
                   include: [
                     {
                       model: Space,
                       as: "space",
-                      where: {
-                        workspaceId,
-                      },
+                      required: true,
+                      where: { workspaceId },
                     },
                   ],
                 },
@@ -101,12 +108,41 @@ export class NotificationRepository {
     });
   }
 
-  async countUnread(userId: number) {
+  async countUnread(userId: number, workspaceId?: number) {
+    if (workspaceId === undefined) {
+      return await Notification.count({ where: { userId, isRead: false } });
+    }
     return await Notification.count({
-      where: {
-        userId,
-        isRead: false,
-      },
+      where: { userId, isRead: false },
+      include: [
+        {
+          model: Task,
+          as: "task",
+          required: true,
+          include: [
+            {
+              model: List,
+              as: "list",
+              required: true,
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                  required: true,
+                  include: [
+                    {
+                      model: Space,
+                      as: "space",
+                      required: true,
+                      where: { workspaceId },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
   }
 

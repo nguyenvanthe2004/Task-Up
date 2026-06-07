@@ -21,14 +21,18 @@ export class NotificationController {
   @Get("/")
   async findAll(
     @CurrentUser() user: UserProps,
+    @QueryParam("workspaceId") workspaceId?: number,
     @QueryParam("isRead") isRead?: boolean,
   ) {
-    return await this.notificationService.findAll(user, isRead);
+    return await this.notificationService.findAll(user, workspaceId, isRead);
   }
 
   @Get("/unread-count")
-  async getUnreadCount(@CurrentUser() user: UserProps) {
-    return await this.notificationService.getUnreadCount(user);
+  async getUnreadCount(
+    @CurrentUser() user: UserProps,
+    @QueryParam("workspaceId") workspaceId?: number,
+  ) {
+    return await this.notificationService.getUnreadCount(user, workspaceId);
   }
   @Get("/latest")
   async findLatest(

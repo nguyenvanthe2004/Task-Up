@@ -108,7 +108,8 @@ export default function CreateWorkspaceModal({
         icon: ICONS[iconIdx].label,
         color: selectedColor,
       });
-      onSuccess?.(res.data.dataValues);
+      const newWorkspace = res.data.dataValues;
+      onSuccess?.(newWorkspace);
       handleClose();
     } catch (error: any) {
       toastError(error.message);

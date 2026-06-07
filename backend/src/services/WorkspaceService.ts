@@ -1,5 +1,6 @@
 import { Service, Inject } from "typedi";
 import { WorkspaceRepository } from "../repositories/WorkspaceRepository";
+import { UserRepository } from "../repositories/UserRepository";
 import { CreateWorkSpaceInput, UpdateWorkSpaceInput } from "../types/workspace";
 import { BadRequestError, NotFoundError } from "routing-controllers";
 import { UserProps } from "../types/auth";
@@ -12,6 +13,10 @@ export class WorkspaceService {
   constructor(
     @Inject(() => WorkspaceRepository)
     private readonly workspaceRepo: WorkspaceRepository,
+
+    @Inject(() => UserRepository)
+    private readonly userRepo: UserRepository,
+
     private readonly mailService: MailService,
   ) {}
 
@@ -56,6 +61,7 @@ export class WorkspaceService {
 
     return { data: workspace };
   }
+
   async findByUser(user: UserProps) {
     const workspace = await this.workspaceRepo.findByUser(user.id);
 
@@ -104,7 +110,25 @@ export class WorkspaceService {
     }
 
     if (workspace.ownerId !== user.id) {
-      throw new BadRequestError("Only owner can invite members");
+      throw new BadRequestError("Only the workspace owner can invite members");
+    }
+
+    // Prevent inviting yourself
+    if (email.toLowerCase() === user.email.toLowerCase()) {
+      throw new BadRequestError("You cannot invite yourself");
+    }
+
+    // Check if the email belongs to an existing user who is already a member
+    const targetUser = await this.userRepo.findByEmail(email);
+    if (targetUser) {
+      const alreadyMember = await this.workspaceRepo.checkUserInWorkspace(
+        workspaceId,
+        targetUser.id,
+      );
+
+      if (alreadyMember) {
+        throw new BadRequestError("This user is already a member of the workspace");
+      }
     }
 
     const inviteToken = generateInviteToken({
@@ -122,11 +146,27 @@ export class WorkspaceService {
     const payload = verifyInviteToken(inviteToken);
 
     if (!payload) {
-      throw new BadRequestError("Invalid or expired invite");
+      throw new BadRequestError("Invalid or expired invite link");
     }
 
-    if (payload.email !== currentUser.email) {
-      throw new BadRequestError("This invite is not for you");
+    if (payload.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+      throw new BadRequestError("This invite was not sent to your email address");
+    }
+
+    // Prevent duplicate membership
+    const alreadyMember = await this.workspaceRepo.checkUserInWorkspace(
+      payload.workspaceId,
+      currentUser.id,
+    );
+
+    if (alreadyMember) {
+      throw new BadRequestError("You are already a member of this workspace");
+    }
+
+    // Ensure the workspace still exists
+    const workspace = await this.workspaceRepo.findOne(payload.workspaceId);
+    if (!workspace) {
+      throw new NotFoundError("The workspace no longer exists");
     }
 
     await this.workspaceRepo.addMember(
@@ -164,18 +204,15 @@ export class WorkspaceService {
     }
 
     if (workspace.ownerId !== user.id) {
-      throw new BadRequestError("You are not allowed to update this workspace");
+      throw new BadRequestError("You are not allowed to delete this workspace");
     }
 
     await this.workspaceRepo.delete(id);
 
     return { message: "Deleted successfully" };
   }
-  async removeMember(
-    workspaceId: number,
-    targetUserId: number,
-    user: UserProps,
-  ) {
+
+  async removeMember(workspaceId: number, targetUserId: number, user: UserProps) {
     const workspace = await this.workspaceRepo.findOne(workspaceId);
 
     if (!workspace) {
@@ -183,11 +220,11 @@ export class WorkspaceService {
     }
 
     if (workspace.ownerId !== user.id) {
-      throw new BadRequestError("Only owner can remove members");
+      throw new BadRequestError("Only the workspace owner can remove members");
     }
 
     if (targetUserId === user.id) {
-      throw new BadRequestError("You cannot remove yourself");
+      throw new BadRequestError("You cannot remove yourself from the workspace");
     }
 
     const isMember = await this.workspaceRepo.checkUserInWorkspace(

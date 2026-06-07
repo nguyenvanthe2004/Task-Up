@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -12,6 +12,7 @@ import {
   callMarkAsRead,
   callMarkAllAsRead,
 } from "../../services/notifications";
+import { useParams } from "react-router-dom";
 import {
   AtSign,
   Bell,
@@ -73,6 +74,7 @@ const groupByDate = (notifications: Notification[]) => {
 
 const NotificationPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const { workspaceId } = useParams();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<FilterTab>("All");
@@ -81,9 +83,10 @@ const NotificationPage: React.FC = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
+      const wsId = workspaceId ? Number(workspaceId) : undefined;
       const [notiRes, countRes] = await Promise.all([
-        callGetNotifications(),
-        callGetUnreadCount(),
+        callGetNotifications(wsId),
+        callGetUnreadCount(wsId),
       ]);
 
       const notificationsData = Array.isArray(notiRes.data)
@@ -106,7 +109,7 @@ const NotificationPage: React.FC = () => {
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!user?.id) return;

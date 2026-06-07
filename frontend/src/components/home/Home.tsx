@@ -16,9 +16,10 @@ import StatsPanel from "./Statspanel";
 import { Attachment } from "../../types/attachment";
 import { isToday } from "../../lib/until";
 import { callGetAttachments } from "../../services/attachment";
-import { FileText, Inbox } from "lucide-react";
+import { FileText } from "lucide-react";
 import { callGetLatestNotifications } from "../../services/notifications";
 import NotificationList from "./NotificationList";
+import SpaceProgress from "./SpaceProgress";
 import { Notification } from "../../types/notification";
 
 const Home: React.FC = () => {
@@ -37,30 +38,24 @@ const Home: React.FC = () => {
   const user = useSelector((state: any) => state.auth.currentUser);
 
   useEffect(() => {
-    if (!user?.id) {
-      setLoadingWorkspaces(false);
-      setLoading(false);
-      return;
-    }
-
     const fetchWorkspaces = async () => {
       try {
         const wsRes = await callGetMyWorkspace();
         setWorkspaces(wsRes.data ?? []);
+      } catch (error: any) {
+
       } finally {
         setLoadingWorkspaces(false);
-        setLoading(false);
       }
     };
 
     fetchWorkspaces();
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     if (!user?.id || !workspaceId || workspaces.length === 0) return;
 
     const fetchWorkspaceData = async () => {
-      setLoading(true);
       try {
         const [taskRes, summaryRes, actRes, atmRes, spaceRes, notiRes] =
           await Promise.allSettled([
@@ -195,9 +190,6 @@ const Home: React.FC = () => {
     );
   }
 
-  const isEmpty =
-    tasks.length === 0 && spaces.length === 0 && activities.length === 0;
-
   if (loading) return <LoadingPage />;
 
   return (
@@ -211,17 +203,11 @@ const Home: React.FC = () => {
                 Welcome back, {user.fullName?.split(" ").pop()} 👋
               </h1>
               <p className="text-slate-500 text-sm">
-                {isEmpty ? (
-                  "This workspace has no data yet."
-                ) : (
-                  <>
-                    You have{" "}
-                    <span className="text-indigo-600 font-semibold">
-                      {summary?.highPriority ?? 0} high-priority tasks
-                    </span>{" "}
-                    assigned to you.
-                  </>
-                )}
+                You have{" "}
+                <span className="text-indigo-600 font-semibold">
+                  {summary?.highPriority ?? 0} high-priority tasks
+                </span>{" "}
+                assigned to you.
               </p>
             </div>
             <div className="flex gap-3 sm:gap-4">
@@ -254,25 +240,11 @@ const Home: React.FC = () => {
             </div>
           </section>
 
-          {isEmpty ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
-                <Inbox className="w-8 h-8 text-indigo-300" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-700 mb-2">
-                This workspace is empty
-              </h2>
-              <p className="text-sm text-slate-400 max-w-xs">
-                You haven't been added to any spaces or have any tasks assigned.
-                Please contact your workspace admin.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
                 <div className="xl:col-span-8 space-y-6 lg:space-y-8">
                   <QuickAccess spaces={spaces} />
                   <NotificationList notifications={notifications} />
+                  <SpaceProgress spaces={spaces} tasks={tasks} />
                 </div>
                 <div className="xl:col-span-4 space-y-4">
                   <StatsPanel
@@ -320,8 +292,6 @@ const Home: React.FC = () => {
                   </div>
                 </section>
               )}
-            </>
-          )}
 
           <div className="h-8" />
         </div>

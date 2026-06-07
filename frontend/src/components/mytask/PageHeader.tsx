@@ -57,18 +57,6 @@ const PageHeader: React.FC<{ view: View; }> = ({
             onClick={() => onClick("calendar")}
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            icon={<ListFilter size={14} />}
-            label="Filter"
-            variant="indigo"
-          />
-          <Button
-            icon={<TextAlignStart size={14} />}
-            label="Sort"
-            variant="indigo"
-          />
-        </div>
       </div>
     </div>
   );

@@ -38,13 +38,13 @@ export class NotificationService {
     private readonly socketService: SocketService,
   ) {}
 
-  async findAll(user: UserProps, isRead?: boolean) {
-    const notifications = await this.notificationRepo.findAll(user.id);
+  async findAll(user: UserProps, workspaceId?: number, isRead?: boolean) {
+    const notifications = await this.notificationRepo.findAll(user.id, workspaceId, isRead);
     return notifications.map((n) => n.get({ plain: true }));
   }
 
-  async getUnreadCount(user: UserProps) {
-    return await this.notificationRepo.countUnread(user.id);
+  async getUnreadCount(user: UserProps, workspaceId?: number) {
+    return await this.notificationRepo.countUnread(user.id, workspaceId);
   }
 
   async findById(id: number, user: UserProps) {

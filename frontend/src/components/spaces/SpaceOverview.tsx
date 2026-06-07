@@ -8,16 +8,14 @@ import { Activity } from "../../types/activity";
 import { Attachment } from "../../types/attachment";
 import { toastError } from "../../lib/toast";
 import { callGetSpaceById } from "../../services/space";
-import { callGetTaskByUser } from "../../services/task";
+import { callGetTasksBySpace } from "../../services/task";
 import { callGetActivities } from "../../services/activity";
 import { callGetAttachments } from "../../services/attachment";
 import { AvatarStack } from "../ui/AvatarStack";
 import SpaceListView from "./SpaceListView";
 import SpaceBoardView from "./SpaceBoardView";
 import SpaceCalendarView from "./SpaceCalendarView";
-import { useSelector } from "react-redux";
-import { RootState } from "../../redux/store";
-import { FileText, Inbox } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Status } from "../../types/status";
 import { priorityBadge } from "../../constants";
 import { fmtDate } from "../../lib/until";
@@ -42,9 +40,6 @@ const SpaceOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
-  const user = useSelector(
-    (state: RootState) => (state.auth as any).currentUser,
-  );
 
   const onClick = (mode: SpaceView) => {
     navigate(`/${workspaceId}/spaces/${spaceId}?mode=${mode}`);
@@ -61,7 +56,7 @@ const SpaceOverview: React.FC = () => {
       try {
         const [spaceRes, taskRes, actRes, atmRes] = await Promise.allSettled([
           callGetSpaceById(Number(spaceId)),
-          callGetTaskByUser(user?.id),
+          callGetTasksBySpace(Number(spaceId)),
           callGetActivities(),
           callGetAttachments(),
         ]);
@@ -69,15 +64,11 @@ const SpaceOverview: React.FC = () => {
         if (spaceRes.status === "fulfilled") setSpace(spaceRes.value.data);
 
         if (taskRes.status === "fulfilled") {
-          const all: Task[] = taskRes.value.data;
-          const filtered = all.filter(
-            (t) =>
-              String((t as any).list?.category?.space?.id) === String(spaceId),
-          );
-          setTasks(filtered);
+          const tasks: Task[] = taskRes.value.data;
+          setTasks(tasks);
           const uniqueStatuses = Array.from(
             new Map(
-              filtered
+              tasks
                 .flatMap((t) => (t.status ? [t.status] : []))
                 .filter((s: any) => s?.id)
                 .map((s: any) => [s.id, s]),
@@ -88,22 +79,22 @@ const SpaceOverview: React.FC = () => {
 
         if (actRes.status === "fulfilled") {
           const all: Activity[] = actRes.value.data;
-          const filtered = all.filter(
-            (a) =>
-              String((a as any).task?.list?.category?.space?.id) ===
-              String(spaceId),
+          setActivities(
+            all.filter(
+              (a) =>
+                String((a as any).task?.list?.category?.space?.id) === String(spaceId),
+            ),
           );
-          setActivities(filtered);
         }
 
         if (atmRes.status === "fulfilled") {
           const all: Attachment[] = atmRes.value.data;
-          const filtered = all.filter(
-            (a) =>
-              String((a.task as any)?.list?.category?.space?.id) ===
-              String(spaceId),
+          setAttachments(
+            all.filter(
+              (a) =>
+                String((a.task as any)?.list?.category?.space?.id) === String(spaceId),
+            ),
           );
-          setAttachments(filtered);
         }
       } catch (error: any) {
         toastError(error.message);
@@ -113,7 +104,7 @@ const SpaceOverview: React.FC = () => {
     };
 
     fetchAll();
-  }, [spaceId, user?.id]);
+  }, [spaceId]);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(

@@ -14,14 +14,18 @@ import BulkStatusModal from "../tools/BulkStatusModal";
 import MiniMonth from "../ui/MiniMonth";
 import DetailTask from "../tasks/DetailTask";
 import { useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 import { RootState } from "../../redux/store";
+import { FilterState, applyFiltersAndSort } from "./FilterSortBar";
 
-const MyTaskCalendarView: React.FC = () => {
+const MyTaskCalendarView: React.FC<{ filters?: FilterState }> = ({ filters }) => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const { workspaceId } = useParams();
 
   const today = dayjs();
   const [current, setCurrent] = useState(today.date(1));
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [rawTasks, setRawTasks] = useState<Task[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -42,7 +46,7 @@ const MyTaskCalendarView: React.FC = () => {
     setLoading(true);
     try {
       const [taskRes, statusRes] = await Promise.all([
-        callGetTaskByUser(user.id),
+        callGetTaskByUser(user.id, workspaceId ? Number(workspaceId) : undefined),
         callGetStatuses(),
       ]);
 
@@ -51,6 +55,7 @@ const MyTaskCalendarView: React.FC = () => {
       setStatuses(sorted);
 
       const allTasks: Task[] = taskRes.data ?? [];
+      setRawTasks(allTasks);
       setTasks(allTasks);
     } catch {
       toastError("Failed to load tasks.");
@@ -62,6 +67,11 @@ const MyTaskCalendarView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!filters) return;
+    setTasks(applyFiltersAndSort(rawTasks, filters));
+  }, [filters, rawTasks]);
 
   const handleUpdate = async (id: number, data: UpdateTask) => {
     try {
@@ -238,10 +248,6 @@ const MyTaskCalendarView: React.FC = () => {
       </div>
     );
   }
-
-  if (tasks.length === 0) return <NotFound />;
-
-  // ── Main ───────────────────────────────────────────────────────────────────
   return (
     <div
       className="w-full mt-4 flex gap-0 overflow-hidden rounded-xl border border-stone-200/60 bg-white/60"

@@ -49,7 +49,7 @@ const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => 
 };
 
 const ListView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId } = useParams<{
+  const { listId, spaceId, workspaceId } = useParams<{
     listId: string;
     spaceId: string;
     workspaceId: string;
@@ -58,7 +58,7 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
   const isOwner = user?.workspaces?.some((w) => {
     const oid = w.ownerId;
-    return (typeof oid === "object" ? oid?.id : oid) === user.id;
+    return w.id === Number(workspaceId) && (typeof oid === "object" ? oid?.id : oid) === user.id;
   }) ?? false;
 
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);

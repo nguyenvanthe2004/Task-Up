@@ -57,12 +57,12 @@ interface CategoryWithGroups extends Category {
 }
 
 const SpaceListView: React.FC = () => {
-  const { spaceId } = useParams<{ spaceId: string }>();
+  const { spaceId, workspaceId } = useParams<{ spaceId: string; workspaceId: string }>();
   const membersRef = useRef<Member[]>([]);
   const user = useSelector((state: RootState) => state.auth.currentUser);
   const isOwner = user?.workspaces?.some((w) => {
     const oid = w.ownerId;
-    return (typeof oid === "object" ? oid?.id : oid) === user.id;
+    return w.id === Number(workspaceId) && (typeof oid === "object" ? oid?.id : oid) === user.id;
   }) ?? false;
 
   const [categoryGroups, setCategoryGroups] = useState<CategoryWithGroups[]>(

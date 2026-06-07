@@ -70,8 +70,8 @@ export class TaskService {
     return tasks.map((task) => task.get({ plain: true }));
   }
 
-  async findByUser(user: UserProps, statusId?: number) {
-    const tasks: Task[] = await this.taskRepo.findByUser(user.id, statusId);
+  async findByUser(user: UserProps, workspaceId?: number, statusId?: number) {
+    const tasks: Task[] = await this.taskRepo.findByUser(user.id, workspaceId, statusId);
     return tasks.map((task) => task.get({ plain: true }));
   }
 
@@ -330,6 +330,7 @@ export class TaskService {
   async search(
     query: string,
     user: UserProps,
+    workspaceId?: number,
     listId?: number,
     statusId?: number,
   ) {
@@ -339,6 +340,7 @@ export class TaskService {
 
     const tasks: Task[] = await this.taskRepo.search(
       query.trim(),
+      workspaceId,
       listId,
       statusId,
     );

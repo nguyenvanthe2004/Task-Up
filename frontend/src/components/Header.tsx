@@ -45,7 +45,7 @@ const Header: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
 
   useEffect(() => {
-    callGetUnreadCount()
+    callGetUnreadCount(workspaceId ? Number(workspaceId) : undefined)
       .then((res) => {
         const count =
           typeof res.data === "number" ? res.data : (res.data?.count ?? 0);
@@ -128,7 +128,7 @@ const Header: React.FC = () => {
     setIsSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await callSearchTasks(value.trim());
+        const res = await callSearchTasks(value.trim(), workspaceId ? Number(workspaceId) : undefined);
         setSearchResults(res.data ?? []);
       } catch {
         setSearchResults([]);

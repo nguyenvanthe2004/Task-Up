@@ -9,13 +9,18 @@ export const callGetTasks = async (listId?: number, statusId?: number) => {
   return await instance.get("/tasks", { params });
 };
 
-export const callGetTaskByUser = async (userId: number, statusId?: number) => {
+export const callGetTaskByUser = async (userId: number, workspaceId?: number, statusId?: number) => {
   return await instance.get("/tasks/by-user", {
     params: {
       userId,
+      ...(workspaceId !== undefined ? { workspaceId } : {}),
       ...(statusId !== undefined ? { statusId } : {}),
     },
   });
+};
+
+export const callGetTasksBySpace = async (spaceId: number) => {
+  return await instance.get("/tasks", { params: { spaceId } });
 };
 
 export const callGetTaskSummary = async () => {
@@ -24,10 +29,12 @@ export const callGetTaskSummary = async () => {
 
 export const callSearchTasks = async (
   query: string,
+  workspaceId?: number,
   listId?: number,
   statusId?: number,
 ) => {
   const params: Record<string, string | number> = { q: query };
+  if (workspaceId !== undefined) params.workspaceId = workspaceId;
   if (listId !== undefined) params.listId = listId;
   if (statusId !== undefined) params.statusId = statusId;
 

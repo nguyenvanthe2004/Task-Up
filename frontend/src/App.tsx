@@ -53,6 +53,17 @@ function App() {
   };
 
   useEffect(() => {
+    const publicPaths = ["/landing", "/login", "/register"];
+    const isPublicPath = publicPaths.some((p) =>
+      window.location.pathname.startsWith(p),
+    );
+    const isOAuthCallback = window.location.pathname.startsWith("/oauth/");
+
+    if (isPublicPath || isOAuthCallback) {
+      setLoading(false);
+      return;
+    }
+
     fetchCurrentUser();
   }, [dispatch]);
 
@@ -61,7 +72,13 @@ function App() {
     if (isAdminRole(currentUser.role) && location.pathname === "/") {
       navigate("/admin", { replace: true });
     }
-  }, [loading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
+  }, [
+    loading,
+    currentUser?.id,
+    currentUser?.role,
+    location.pathname,
+    navigate,
+  ]);
 
   if (loading) return <LoadingPage />;
 

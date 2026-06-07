@@ -1,13 +1,18 @@
 import instance from "./req";
 
-export const callGetNotifications = async (isRead?: boolean) => {
+export const callGetNotifications = async (workspaceId?: number, isRead?: boolean) => {
   return await instance.get("/notifications", {
-    params: isRead !== undefined ? { isRead } : {},
+    params: {
+      ...(workspaceId !== undefined && { workspaceId }),
+      ...(isRead !== undefined && { isRead }),
+    },
   });
 };
 
-export const callGetUnreadCount = async () => {
-  return await instance.get("/notifications/unread-count");
+export const callGetUnreadCount = async (workspaceId?: number) => {
+  return await instance.get("/notifications/unread-count", {
+    params: workspaceId !== undefined ? { workspaceId } : {},
+  });
 };
 
 export const callGetNotificationById = async (id: number) => {

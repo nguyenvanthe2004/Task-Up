@@ -17,19 +17,23 @@ import { fmtDate } from "../../lib/until";
 import DetailTask from "../tasks/DetailTask";
 import NotFound from "../ui/NotFound";
 import { useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 import { RootState } from "../../redux/store";
 import { GRID_COLS } from "../tools/InlineCreateRow";
 import BulkStatusModal from "../tools/BulkStatusModal";
+import { FilterState, applyFiltersAndSort } from "./FilterSortBar";
 
 interface StatusGroup {
   status: Status;
   tasks: Task[];
 }
 
-const MyTaskListView: React.FC = () => {
+const MyTaskListView: React.FC<{ filters?: FilterState }> = ({ filters }) => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
+  const { workspaceId } = useParams();
 
   const [statusGroups, setStatusGroups] = useState<StatusGroup[]>([]);
+  const [rawGroups, setRawGroups] = useState<StatusGroup[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [selected, setSelected] = useState<Task | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
@@ -42,9 +46,11 @@ const MyTaskListView: React.FC = () => {
     setLoading(true);
     try {
       const [taskRes, statusRes] = await Promise.all([
-        callGetTaskByUser(user.id),
+        callGetTaskByUser(user.id, workspaceId ? Number(workspaceId) : undefined),
         callGetStatuses(),
       ]);
+
+      console.log(taskRes)
 
       const sts: Status[] = statusRes.data;
       const sorted = [...sts].sort((a, b) => a.position - b.position);
@@ -65,6 +71,12 @@ const MyTaskListView: React.FC = () => {
           tasks: taskMap.get(s.id) ?? [],
         })),
       );
+      setRawGroups(
+        sorted.map((s) => ({
+          status: s,
+          tasks: taskMap.get(s.id) ?? [],
+        })),
+      );
     } catch {
       toastError("Failed to load tasks.");
     } finally {
@@ -75,6 +87,16 @@ const MyTaskListView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!filters) return;
+    setStatusGroups(
+      rawGroups.map((g) => ({
+        ...g,
+        tasks: applyFiltersAndSort(g.tasks, filters),
+      })),
+    );
+  }, [filters, rawGroups]);
 
   const handleUpdateStatus = async (taskId: number, statusId: number) => {
     try {
@@ -407,11 +429,7 @@ const MyTaskListView: React.FC = () => {
         </div>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
-          {statusGroups.every((sg) => sg.tasks.length === 0) ? (
-            <NotFound />
-          ) : (
-            statusGroups.map(renderStatusGroup)
-          )}
+          {statusGroups.map(renderStatusGroup)}
         </DragDropContext>
       )}
 

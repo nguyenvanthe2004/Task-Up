@@ -107,7 +107,7 @@ export class TaskRepository {
     });
   }
 
-  async findByUser(userId: number, statusId?: number) {
+  async findByUser(userId: number, workspaceId?: number, statusId?: number) {
     return await Task.findAll({
       where: {
         ...(statusId !== undefined ? { statusId } : {}),
@@ -134,21 +134,26 @@ export class TaskRepository {
           model: List,
           as: "list",
           attributes: ["id", "name"],
+          required: workspaceId !== undefined,
           include: [
             {
               model: Category,
               as: "category",
               attributes: ["id", "name"],
+              required: workspaceId !== undefined,
               include: [
                 {
                   model: Space,
                   as: "space",
                   attributes: ["id", "name"],
+                  required: workspaceId !== undefined,
                   include: [
                     {
                       model: Workspace,
                       as: "workspace",
                       attributes: ["id", "name", "ownerId"],
+                      ...(workspaceId !== undefined && { where: { id: workspaceId } }),
+                      required: workspaceId !== undefined,
                     },
                   ],
                 },
@@ -161,7 +166,7 @@ export class TaskRepository {
     });
   }
 
-  async search(query: string, listId?: number, statusId?: number) {
+  async search(query: string, workspaceId?: number, listId?: number, statusId?: number) {
     const whereClause: any = {
       name: { [Op.like]: `%${query}%` },
       ...(listId !== undefined && { listId }),
@@ -186,21 +191,26 @@ export class TaskRepository {
           model: List,
           as: "list",
           attributes: ["id", "name"],
+          required: workspaceId !== undefined,
           include: [
             {
               model: Category,
               as: "category",
               attributes: ["id", "name"],
+              required: workspaceId !== undefined,
               include: [
                 {
                   model: Space,
                   as: "space",
                   attributes: ["id", "name"],
+                  required: workspaceId !== undefined,
                   include: [
                     {
                       model: Workspace,
                       as: "workspace",
                       attributes: ["id", "name", "ownerId"],
+                      ...(workspaceId !== undefined && { where: { id: workspaceId } }),
+                      required: workspaceId !== undefined,
                     },
                   ],
                 },

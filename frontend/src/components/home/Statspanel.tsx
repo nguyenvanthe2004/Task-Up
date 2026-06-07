@@ -51,6 +51,7 @@ const StatsPanel: React.FC<Props> = ({ summary, tasks, activities }) => {
           </div>
         )}
       </section>
+
       <TaskCompletionChart
         completed={summary?.completed ?? 0}
         total={summary?.total ?? 0}

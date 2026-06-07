@@ -32,9 +32,10 @@ export class TaskController {
   @Get("/by-user")
   async findByUser(
     @CurrentUser() user: UserProps,
+    @QueryParam("workspaceId") workspaceId?: number,
     @QueryParam("statusId") statusId?: number,
   ) {
-    return await this.taskService.findByUser(user, statusId);
+    return await this.taskService.findByUser(user, workspaceId, statusId);
   }
 
   @Get("/summary")
@@ -46,10 +47,11 @@ export class TaskController {
   async searchTasks(
     @CurrentUser() user: UserProps,
     @QueryParam("q", { required: true }) q: string,
+    @QueryParam("workspaceId") workspaceId?: number,
     @QueryParam("listId") listId?: number,
     @QueryParam("statusId") statusId?: number,
   ) {
-    return this.taskService.search(q, user, listId, statusId);
+    return this.taskService.search(q, user, workspaceId, listId, statusId);
   }
 
   @Get("/:id")

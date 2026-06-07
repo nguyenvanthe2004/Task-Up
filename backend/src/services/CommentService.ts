@@ -7,6 +7,7 @@ import { CreateCommentInput, UpdateCommentInput } from "../types/comment";
 import { ActivityService } from "./ActivityService";
 import { NotificationService } from "./NotificationService";
 import { SocketService } from "./SocketService";
+import { User } from "../models";
 
 @Service()
 export class CommentService {
@@ -45,7 +46,7 @@ export class CommentService {
     `${user.fullName} added a comment to task`, comment!.id,
   );
 
-  const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
+  const assigneeIds = task.assignees?.map((a: User) => a.id) ?? [];
   const recipients = Array.from(new Set([...assigneeIds, user.id]));
 
   const plain = comment!.get({ plain: true });
