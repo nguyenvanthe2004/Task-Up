@@ -6,32 +6,14 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    console.log("========== MAIL CONFIG ==========");
-    console.log("MAIL_USER:", process.env.MAIL_USER);
-    console.log(
-      "MAIL_PASS:",
-      process.env.MAIL_PASS ? "EXISTS" : "MISSING"
-    );
-    console.log("=================================");
-
     this.transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
+      host: "smtp-relay.brevo.com",
       port: 587,
       secure: false,
       auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
+        user: process.env.BREVO_USER,
+        pass: process.env.BREVO_PASS,
       },
-      logger: true,
-      debug: true,
-    });
-
-    this.transporter.verify((error, success) => {
-      if (error) {
-        console.error("SMTP Verify Error:", error);
-      } else {
-        console.log("SMTP Server is ready");
-      }
     });
   }
   async sendForgotPassword(email: string, code: string) {
