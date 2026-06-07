@@ -16,13 +16,21 @@ export class MailService {
       },
     });
   }
-  async sendForgotPassword(email: string, code: string) {
-    await this.transporter.sendMail({
-      from: `"TaskUp" <${process.env.MAIL_USER}>`,
-      to: email,
-      subject: "Password reset",
-      html: `<h2>Your new password: ${code}</h2>`,
-    });
+  async sendVerifyCode(email: string, code: string) {
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"TaskUp" <${process.env.MAIL_USER}>`,
+        to: email,
+        subject: "Email verification",
+        html: `<h2>Your verification code: ${code}</h2>`,
+      });
+
+      console.log("Mail sent:", info.messageId);
+      return info;
+    } catch (error) {
+      console.error("Send verify mail error:", error);
+      throw error;
+    }
   }
   async sendInviteEmail(email: string, inviteToken: string) {
     const acceptUrl = `${process.env.FRONTEND_URL}/landing?inviteToken=${inviteToken}`;
