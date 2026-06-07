@@ -673,7 +673,6 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                     onClose={() => setOpenCreateDate(null)}
                     onCreated={() => {
                       setOpenCreateDate(null);
-                      fetchData();
                     }}
                   />
                 )}

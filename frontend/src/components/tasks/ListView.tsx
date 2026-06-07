@@ -659,7 +659,6 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                           onClose={() => setOpenInlineStatusId(null)}
                           onCreated={() => {
                             setOpenInlineStatusId(null);
-                            fetchData();
                           }}
                         />
                       )}
