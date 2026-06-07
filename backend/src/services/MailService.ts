@@ -6,6 +6,8 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    console.log("BREVO_USER =", process.env.BREVO_USER);
+    console.log("BREVO_PASS =", process.env.BREVO_PASS ? "EXISTS" : "MISSING");
     this.transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com",
       port: 587,
@@ -14,6 +16,13 @@ export class MailService {
         user: process.env.BREVO_USER,
         pass: process.env.BREVO_PASS,
       },
+    });
+    this.transporter.verify((err, success) => {
+      if (err) {
+        console.error("VERIFY ERROR:", err);
+      } else {
+        console.log("SMTP READY");
+      }
     });
   }
   async sendVerifyCode(email: string, code: string) {
