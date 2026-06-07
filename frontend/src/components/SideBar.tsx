@@ -49,6 +49,8 @@ import {
   callGetMyWorkspace,
   callGetWorkspaceById,
 } from "../services/workspace";
+import { setCurrentUser } from "../redux/slices/currentUser";
+import { User } from "../types/auth";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Rocket,
@@ -115,7 +117,9 @@ const SideBar: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { workspaceId } = useParams();
-  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
+    null,
+  );
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,37 +131,52 @@ const SideBar: React.FC = () => {
   const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
   const dispatch = useDispatch();
 
   const { isOpen: isOpenSpace, open: openSpace, close } = useModal();
-  const { isOpen: isOpenCategory, open: openCategory, close: closeCategory } = useModal();
+  const {
+    isOpen: isOpenCategory,
+    open: openCategory,
+    close: closeCategory,
+  } = useModal();
   const { isOpen: isOpenList, open: openList, close: closeList } = useModal();
 
   const user = useSelector((state: RootState) => state.auth.currentUser);
   const userWorkspaces: Workspace[] = user?.workspaces ?? [];
-  const workspace = currentWorkspace ?? userWorkspaces.find((w) => w.id === Number(workspaceId));
+  const workspace =
+    currentWorkspace ??
+    userWorkspaces.find((w) => w.id === Number(workspaceId));
 
-  // ─── Fetch all workspaces the user belongs to ──────────────────────────────
   const fetchAllWorkspaces = async () => {
     if (!user?.id) return;
     try {
       const res = await callGetMyWorkspace();
       const data = res.data.map((ws: any) => ws.dataValues ?? ws);
       setAllWorkspaces(data);
-    } catch {
-      // silently ignore
-    }
+
+      dispatch(setCurrentUser({ ...user, workspaces: data } as User));
+    } catch {}
   };
 
   useEffect(() => {
-    fetchAllWorkspaces();
+    const handleWorkspaceJoined = (e: Event) => {
+      const detail = (e as CustomEvent<{ workspaceId?: number }>).detail;
+
+      fetchAllWorkspaces().then(() => {
+        if (detail?.workspaceId) {
+          navigate(`/${detail.workspaceId}`, { replace: true });
+        }
+      });
+    };
+
+    window.addEventListener(WORKSPACE_JOINED_EVENT, handleWorkspaceJoined);
+    return () =>
+      window.removeEventListener(WORKSPACE_JOINED_EVENT, handleWorkspaceJoined);
   }, [user?.id]);
 
-  // ─── Listen for workspace:joined event (fired after acceptInvite) ──────────
-  // This is the key fix: when a user accepts an invite anywhere in the app,
-  // dispatch `new CustomEvent(WORKSPACE_JOINED_EVENT)` and the sidebar will
-  // automatically refresh the workspace list and navigate to the new workspace.
   useEffect(() => {
     const handleWorkspaceJoined = (e: Event) => {
       const detail = (e as CustomEvent<{ workspaceId?: number }>).detail;
@@ -169,7 +188,8 @@ const SideBar: React.FC = () => {
     };
 
     window.addEventListener(WORKSPACE_JOINED_EVENT, handleWorkspaceJoined);
-    return () => window.removeEventListener(WORKSPACE_JOINED_EVENT, handleWorkspaceJoined);
+    return () =>
+      window.removeEventListener(WORKSPACE_JOINED_EVENT, handleWorkspaceJoined);
   }, [user?.id]);
 
   const ref = useRef<HTMLDivElement>(null);
@@ -239,7 +259,9 @@ const SideBar: React.FC = () => {
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId, user?.id]);
 
   const handleCreateSpace = async (data: CreateSpaceFormData) => {
@@ -328,7 +350,9 @@ const SideBar: React.FC = () => {
           prev.includes(spaceIdx) ? prev : [...prev, spaceIdx],
         );
         space.categories.forEach((cat, catIdx) => {
-          if (pathname.includes(`/${workspaceId}/spaces/${space.id}/${cat.id}`)) {
+          if (
+            pathname.includes(`/${workspaceId}/spaces/${space.id}/${cat.id}`)
+          ) {
             const key = `${spaceIdx}-${catIdx}`;
             setOpenCategories((prev) =>
               prev.includes(key) ? prev : [...prev, key],
@@ -374,7 +398,10 @@ const SideBar: React.FC = () => {
                   openCategory();
                 }}
               >
-                <Plus size={12} className="text-slate-400 hover:text-indigo-600" />
+                <Plus
+                  size={12}
+                  className="text-slate-400 hover:text-indigo-600"
+                />
               </button>
             </div>
             {isSpaceOpen && (
@@ -413,17 +440,26 @@ const SideBar: React.FC = () => {
                             openList();
                           }}
                         >
-                          <Plus size={11} className="text-slate-400 hover:text-indigo-600" />
+                          <Plus
+                            size={11}
+                            className="text-slate-400 hover:text-indigo-600"
+                          />
                         </button>
                       </div>
                       {isCatOpen && (
                         <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-100 pl-2">
                           {cat.lists.map((list) => {
-                            const listActive = isListPath(space.id, cat.id, list.id);
+                            const listActive = isListPath(
+                              space.id,
+                              cat.id,
+                              list.id,
+                            );
                             return (
                               <button
                                 key={list.id}
-                                onClick={() => navigateToList(space.id, cat.id, list.id)}
+                                onClick={() =>
+                                  navigateToList(space.id, cat.id, list.id)
+                                }
                                 className={`w-full flex items-center gap-1.5 px-1.5 py-1.5 rounded-md text-[12.5px] transition-all duration-150 ${
                                   listActive
                                     ? "bg-indigo-50 text-indigo-600 font-medium"
@@ -470,8 +506,12 @@ const SideBar: React.FC = () => {
             {active && (
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-indigo-600 rounded-r-full" />
             )}
-            <span className={`transition-colors relative w-4 h-4 ${active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}>
-              <span className={`absolute inset-0 transition-all duration-200 ${isSpace ? "opacity-100 group-hover:opacity-0 group-hover:scale-75" : ""}`}>
+            <span
+              className={`transition-colors relative w-4 h-4 ${active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}
+            >
+              <span
+                className={`absolute inset-0 transition-all duration-200 ${isSpace ? "opacity-100 group-hover:opacity-0 group-hover:scale-75" : ""}`}
+              >
                 {item.icon}
               </span>
               {isSpace && (
@@ -493,7 +533,10 @@ const SideBar: React.FC = () => {
             <div className="flex items-center gap-1">
               <Plus
                 size={16}
-                onClick={(e) => { e.stopPropagation(); openSpace(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openSpace();
+                }}
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
               />
             </div>
@@ -517,7 +560,10 @@ const SideBar: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div onClick={() => setIsOpen(false)} className="fixed inset-0 bg-black/30 z-40 lg:hidden" />
+        <div
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+        />
       )}
 
       <CreateWorkspaceModal
@@ -540,15 +586,24 @@ const SideBar: React.FC = () => {
               className="w-9 h-9 rounded-lg flex items-center justify-center text-white flex-shrink-0 transition-colors duration-300"
               style={{ backgroundColor: workspace?.color ?? "#6366F1" }}
             >
-              <WorkspaceIcon icon={workspace?.icon} name={workspace?.name} className="h-5 w-5" emojiSize={18} />
+              <WorkspaceIcon
+                icon={workspace?.icon}
+                name={workspace?.name}
+                className="h-5 w-5"
+                emojiSize={18}
+              />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-900 leading-tight truncate">
                 {workspace?.name ?? "Workspace"}
               </p>
-              <p className="text-[10.5px] text-slate-400 truncate">{workspace?.description}</p>
+              <p className="text-[10.5px] text-slate-400 truncate">
+                {workspace?.description}
+              </p>
             </div>
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${openDropdown ? "rotate-180" : ""}`} />
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${openDropdown ? "rotate-180" : ""}`}
+            />
           </div>
 
           {/* Dropdown */}
@@ -559,17 +614,29 @@ const SideBar: React.FC = () => {
                   className="w-9 h-9 rounded-lg flex items-center justify-center text-white flex-shrink-0"
                   style={{ backgroundColor: workspace?.color ?? "#6366F1" }}
                 >
-                  <WorkspaceIcon icon={workspace?.icon} name={workspace?.name} className="h-5 w-5" emojiSize={18} />
+                  <WorkspaceIcon
+                    icon={workspace?.icon}
+                    name={workspace?.name}
+                    className="h-5 w-5"
+                    emojiSize={18}
+                  />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{workspace?.name}</p>
-                  <p className="text-[10.5px] text-slate-400">{members?.users?.length || 0} members</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {workspace?.name}
+                  </p>
+                  <p className="text-[10.5px] text-slate-400">
+                    {members?.users?.length || 0} members
+                  </p>
                 </div>
               </div>
 
               <div className="flex gap-2 px-3 py-2 border-b border-slate-100">
                 <button
-                  onClick={() => { navigate(`/${workspaceId}/members`); setOpenDropdown(false); }}
+                  onClick={() => {
+                    navigate(`/${workspaceId}/members`);
+                    setOpenDropdown(false);
+                  }}
                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   <Users className="w-3.5 h-3.5" /> People
@@ -577,14 +644,25 @@ const SideBar: React.FC = () => {
               </div>
 
               <div className="pt-2">
-                <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Manage</p>
+                <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                  Manage
+                </p>
                 {[
                   { icon: <Puzzle className="w-4 h-4" />, label: "Apps" },
-                  { icon: <LayoutTemplate className="w-4 h-4" />, label: "Templates" },
-                  { icon: <Wrench className="w-4 h-4" />, label: "Custom Fields" },
+                  {
+                    icon: <LayoutTemplate className="w-4 h-4" />,
+                    label: "Templates",
+                  },
+                  {
+                    icon: <Wrench className="w-4 h-4" />,
+                    label: "Custom Fields",
+                  },
                   { icon: <Zap className="w-4 h-4" />, label: "Automations" },
                 ].map(({ icon, label }) => (
-                  <button key={label} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  <button
+                    key={label}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
                     {icon} {label}
                   </button>
                 ))}
@@ -592,9 +670,12 @@ const SideBar: React.FC = () => {
 
               <div className="h-px bg-slate-100 my-1" />
 
-              {allWorkspaces.filter((ws) => ws.id !== workspace?.id).length > 0 && (
+              {allWorkspaces.filter((ws) => ws.id !== workspace?.id).length >
+                0 && (
                 <div className="pt-1">
-                  <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Switch Workspace</p>
+                  <p className="px-4 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                    Switch Workspace
+                  </p>
                   <div className="px-2 pb-2 max-h-48 overflow-y-auto">
                     {allWorkspaces
                       .filter((ws) => ws.id !== workspace?.id)
@@ -608,9 +689,16 @@ const SideBar: React.FC = () => {
                             className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0"
                             style={{ backgroundColor: ws.color ?? "#6366F1" }}
                           >
-                            <WorkspaceIcon icon={ws.icon} name={ws.name} className="h-4 w-4" emojiSize={14} />
+                            <WorkspaceIcon
+                              icon={ws.icon}
+                              name={ws.name}
+                              className="h-4 w-4"
+                              emojiSize={14}
+                            />
                           </div>
-                          <span className="text-sm text-slate-700 truncate">{ws.name}</span>
+                          <span className="text-sm text-slate-700 truncate">
+                            {ws.name}
+                          </span>
                         </button>
                       ))}
                   </div>
@@ -619,7 +707,10 @@ const SideBar: React.FC = () => {
 
               <div className="px-3 pb-3">
                 <button
-                  onClick={() => { setOpenDropdown(false); setOpen(true); }}
+                  onClick={() => {
+                    setOpenDropdown(false);
+                    setOpen(true);
+                  }}
                   className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-slate-300 rounded-lg text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all"
                 >
                   <Plus className="w-4 h-4" /> Create Workspace
@@ -653,7 +744,9 @@ const SideBar: React.FC = () => {
               {isActive(item.path) && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-indigo-600 rounded-r-full" />
               )}
-              <span className={`transition-colors ${isActive(item.path) ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}>
+              <span
+                className={`transition-colors ${isActive(item.path) ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}`}
+              >
                 {item.icon}
               </span>
               <span>{item.label}</span>
@@ -672,7 +765,12 @@ const SideBar: React.FC = () => {
           className="w-9 h-9 rounded-lg flex items-center justify-center text-white mb-4 flex-shrink-0 mx-auto transition-colors duration-300"
           style={{ backgroundColor: workspace?.color ?? "#6366F1" }}
         >
-          <WorkspaceIcon icon={workspace?.icon} name={workspace?.name} className="h-5 w-5" emojiSize={18} />
+          <WorkspaceIcon
+            icon={workspace?.icon}
+            name={workspace?.name}
+            className="h-5 w-5"
+            emojiSize={18}
+          />
         </div>
 
         <nav className="flex-1 flex flex-col gap-1 w-full px-2 overflow-y-auto">
@@ -732,9 +830,21 @@ const SideBar: React.FC = () => {
         </div>
       </aside>
 
-      <CreateSpaceModal isOpen={isOpenSpace} onClose={close} onSubmit={handleCreateSpace} />
-      <CreateCategoryModal isOpen={isOpenCategory} onClose={closeCategory} onSubmit={handleCreateCategory} />
-      <CreateListModal isOpen={isOpenList} onClose={closeList} onSubmit={handleCreateList} />
+      <CreateSpaceModal
+        isOpen={isOpenSpace}
+        onClose={close}
+        onSubmit={handleCreateSpace}
+      />
+      <CreateCategoryModal
+        isOpen={isOpenCategory}
+        onClose={closeCategory}
+        onSubmit={handleCreateCategory}
+      />
+      <CreateListModal
+        isOpen={isOpenList}
+        onClose={closeList}
+        onSubmit={handleCreateList}
+      />
     </>
   );
 };

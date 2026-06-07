@@ -48,7 +48,6 @@ const useAcceptInvite = () => {
         window.dispatchEvent(
           new CustomEvent(WORKSPACE_JOINED_EVENT, { detail: { workspaceId } }),
         );
-        if (workspaceId) navigate(`/${workspaceId}`, { replace: true });
       } catch {
         navigate("/", { replace: true });
       }
