@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import ReactQuill from "react-quill-new";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,6 +31,8 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
   onClose,
   onSaved,
 }) => {
+  const submittingRef = useRef(false);
+
   const {
     register,
     handleSubmit,
@@ -54,12 +56,18 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
   const startDate = watch("startDate");
 
   const onSubmit = async (data: UpdateTaskFormData) => {
-    await onSaved(task.id, {
-      ...data,
-      startDate: toISO(data.startDate),
-      dueDate: toISO(data.dueDate),
-    } as UpdateTask);
-    onClose();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await onSaved(task.id, {
+        ...data,
+        startDate: toISO(data.startDate),
+        dueDate: toISO(data.dueDate),
+      } as UpdateTask);
+      onClose();
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   return (
@@ -282,7 +290,7 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
 
         <div className="flex gap-1.5">
           <button
-            onClick={handleSubmit(onSubmit)}
+            type="submit"
             disabled={isSubmitting}
             className="flex items-center gap-1 px-2.5 py-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
           >

@@ -332,57 +332,6 @@ export default function UpdateListModal({
                 ))}
               </div>
             </div>
-
-            {/* Visibility toggle */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-3">
-                Visibility
-              </label>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setValue("isPublic", !isPublic, { shouldValidate: true })}
-                className="w-full flex items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 hover:border-neutral-300 transition-colors disabled:opacity-50"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 transition-colors duration-300"
-                    style={{
-                      backgroundColor: isPublic ? `${selectedColor}18` : "#f5f5f4",
-                      color: isPublic ? selectedColor : "#78716c",
-                    }}
-                  >
-                    <span
-                      className="material-symbols-outlined text-[18px]"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      {isPublic ? "public" : "lock"}
-                    </span>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-neutral-900">
-                      {isPublic ? "Public" : "Private"}
-                    </p>
-                    <p className="text-xs text-neutral-400">
-                      {isPublic
-                        ? "Everyone in the space can see this list"
-                        : "Only invited members can access this list"}
-                    </p>
-                  </div>
-                </div>
-                {/* Toggle switch */}
-                <div
-                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 flex-shrink-0 ml-4"
-                  style={{ backgroundColor: isPublic ? selectedColor : "#d1d5db" }}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-300 ${
-                      isPublic ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </div>
-              </button>
-            </div>
           </div>
         )}
 

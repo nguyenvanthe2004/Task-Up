@@ -39,7 +39,11 @@ import { io, Socket } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
-const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
+const canViewTask = (
+  task: Task,
+  userId: number,
+  isOwner?: boolean,
+): boolean => {
   if (isTaskPublic(task)) return true;
   if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
@@ -56,10 +60,14 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
   }>();
 
   const user = useSelector((state: RootState) => state.auth.currentUser);
-  const isOwner = user?.workspaces?.some((w) => {
-    const oid = w.ownerId;
-    return w.id === Number(workspaceId) && (typeof oid === "object" ? oid?.id : oid) === user.id;
-  }) ?? false;
+  const isOwner =
+    user?.workspaces?.some((w) => {
+      const oid = w.ownerId;
+      return (
+        w.id === Number(workspaceId) &&
+        (typeof oid === "object" ? oid?.id : oid) === user.id
+      );
+    }) ?? false;
 
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -138,18 +146,9 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
       socket.emit("join", { userId: user.id });
     });
 
-    socket.on("task:created", async (data: { taskId: number }) => {
+    socket.on("task:created", async (_data: { taskId: number }) => {
       try {
-        const res = await callGetTasks(Number(listId));
-        const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
-        if (!newTask) return;
-        setGroups((prev) =>
-          prev.map((g) =>
-            g.status.id === newTask.statusId
-              ? { ...g, tasks: [...g.tasks, newTask] }
-              : g,
-          ),
-        );
+        await fetchData();
       } catch {}
     });
 

@@ -4,7 +4,12 @@ import ReactQuill from "react-quill-new";
 import { CreateTaskFormData, CreateTaskSchema } from "../../validations/task";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PriorityStatus, QUILL_FORMATS, QUILL_MODULES, today } from "../../constants";
+import {
+  PriorityStatus,
+  QUILL_FORMATS,
+  QUILL_MODULES,
+  today,
+} from "../../constants";
 import { callCreateTask } from "../../services/task";
 import { stripHtml, toISO } from "../../lib/until";
 import { toastError, toastSuccess } from "../../lib/toast";
@@ -32,6 +37,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
   onCreated,
 }) => {
   const nameRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -59,6 +65,8 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
   }, []);
 
   const onSubmit = async (data: CreateTaskFormData) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       await callCreateTask({
         ...data,
@@ -72,6 +80,8 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
       onCreated();
     } catch {
       toastError("Failed to create task.");
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -270,7 +280,9 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
             name="isPublic"
             render={({ field }) => (
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <span className={`text-[11px] font-medium transition-colors ${isPublic ? "text-indigo-500" : "text-stone-400"}`}>
+                <span
+                  className={`text-[11px] font-medium transition-colors ${isPublic ? "text-indigo-500" : "text-stone-400"}`}
+                >
                   {isPublic ? "Public" : "Private"}
                 </span>
                 <button
@@ -312,7 +324,9 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
               className="h-[30px] w-[30px] flex items-center justify-center rounded-lg
                    border border-stone-200 text-stone-400 hover:bg-stone-100 transition-colors"
             >
-              <span className="material-symbols-outlined text-[14px]">close</span>
+              <span className="material-symbols-outlined text-[14px]">
+                close
+              </span>
             </button>
           </div>
         </div>
