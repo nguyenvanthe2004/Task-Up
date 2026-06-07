@@ -79,7 +79,7 @@ const Member: React.FC = () => {
   };
 
   return (
-    <main className="lg:ml-64 mt-10 pt-5 pb-16 min-h-screen bg-slate-50">
+    <main className="pb-16 min-h-screen bg-slate-50">
       <div className="flex flex-col max-w-8xl">
         {/* Top bar */}
         <div className="px-6 pt-6 pb-4 flex items-start justify-between flex-shrink-0">

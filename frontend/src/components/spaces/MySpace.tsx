@@ -275,7 +275,7 @@ const MySpace: React.FC = () => {
     ));
 
   return (
-    <main className="ml-64 pt-14 min-h-screen bg-background">
+    <main className="min-h-screen bg-background">
       <div className="max-w-8xl mx-auto p-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -300,14 +300,6 @@ const MySpace: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading && renderSkeletons()}
-          {!loading && spaces.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-16 gap-4">
-              <FolderOpen className="w-10 h-10 text-outline" />
-              <p className="text-on-surface-variant text-sm">
-                No spaces found. Create your first space to get started.
-              </p>
-            </div>
-          )}
           {!loading && spaces.map((s) => renderCard(s))}
           {!loading && (
             <div

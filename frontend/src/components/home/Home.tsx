@@ -194,7 +194,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <div className="lg:pl-64 pt-10 min-h-screen">
+      <div className="min-h-screen">
         <div className="p-5 sm:p-6 lg:p-8 max-w-8xl">
           {/* Header */}
           <section className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-5">

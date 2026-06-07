@@ -28,7 +28,7 @@ const MyTask: React.FC = () => {
   }, [workspaceId]);
 
   return (
-    <main className="ml-0 lg:ml-64 mt-[55px] min-h-screen p-4 sm:p-6 lg:p-8">
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
       <PageHeader view={view} />
       <FilterSortBar spaces={spaces} filters={filters} onChange={setFilters} />
 

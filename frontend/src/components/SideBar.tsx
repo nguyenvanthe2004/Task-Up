@@ -511,7 +511,7 @@ const SideBar: React.FC = () => {
       {/* Mobile toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`lg:hidden fixed top-1/2 -translate-y-1/2 z-50 bg-white border border-slate-200 shadow-md rounded-lg p-2 transition-all duration-300 ${isOpen ? "left-60" : "left-2"}`}
+        className={`lg:hidden fixed top-1/2 -translate-y-1/2 z-50 bg-white border border-slate-200 shadow-md rounded-lg p-2 transition-all duration-300 ${isOpen ? "left-52" : "left-2"}`}
       >
         {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </button>
@@ -530,7 +530,7 @@ const SideBar: React.FC = () => {
         isLoading={loading}
       />
 
-      <aside className="hidden lg:flex flex-col h-screen w-60 fixed left-0 top-0 border-r border-slate-200 bg-slate-50 z-40">
+      <aside className="hidden lg:flex flex-col h-screen w-52 fixed left-0 top-0 border-r border-slate-200 bg-slate-50 z-40">
         <div ref={ref} className="relative inline-block">
           <div
             className="flex items-center gap-3 px-5 mt-20 cursor-pointer"
@@ -664,7 +664,7 @@ const SideBar: React.FC = () => {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`lg:hidden flex flex-col h-screen w-60 fixed left-0 top-0 border-r border-slate-200 bg-slate-50 z-50 py-3 transform transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden flex flex-col h-screen w-52 fixed left-0 top-0 border-r border-slate-200 bg-slate-50 z-50 py-3 transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

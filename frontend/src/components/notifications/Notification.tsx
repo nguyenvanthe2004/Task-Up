@@ -173,7 +173,7 @@ const NotificationPage: React.FC = () => {
   const grouped = groupByDate(filtered);
 
   return (
-    <main className="lg:ml-64 pt-16 px-6 mt-10 md:px-10 pb-16 min-h-screen bg-slate-50">
+    <main className="px-6 md:px-10 pb-16 min-h-screen bg-slate-50">
       <div className="max-w-8xl mx-auto">
         {/* HEADER */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">

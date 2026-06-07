@@ -130,7 +130,7 @@ const SpaceOverview: React.FC = () => {
     { key: "calendar", icon: "calendar_month", label: "Calendar" },
   ];
   return (
-    <main className="ml-64 pt-14 min-h-screen flex flex-col">
+    <main className="min-h-screen flex flex-col">
       <div className="p-8 max-w-8xl mx-auto w-full">
         {/* ── Header ── */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-5">

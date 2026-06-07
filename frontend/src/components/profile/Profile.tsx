@@ -22,7 +22,7 @@ const Profile: React.FC = () => {
   const handleWorkspaceChange = (id: WorkspaceId) => setActiveNav(id);
 
   return (
-    <div className="flex ml-0 lg:ml-60 mt-16 min-h-screen">
+    <div className="flex min-h-screen">
       <ProfileSidebar
         activeNav={activeNav}
         sidebarOpen={sidebarOpen}

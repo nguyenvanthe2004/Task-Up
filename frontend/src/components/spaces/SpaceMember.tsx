@@ -50,7 +50,7 @@ const SpaceMember: React.FC = () => {
   };
 
   return (
-    <main className="pl-64 mt-10 min-h-screen">
+    <main className="min-h-screen">
       <section className="py-10 px-5 max-w-8xl mx-auto">
         <div className="flex justify-between items-end mb-8">
           <div>

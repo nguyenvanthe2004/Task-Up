@@ -11,7 +11,7 @@ const HomeLayout: React.FC<Props> = ({ children }) => {
     <div className="bg-background text-on-surface min-h-screen antialiased">
       <Header />
       <SideBar />
-      {children}
+      <div className="lg:ml-52 pt-14">{children}</div>
     </div>
   );
 };
