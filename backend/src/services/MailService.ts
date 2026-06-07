@@ -6,6 +6,14 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    console.log("========== MAIL CONFIG ==========");
+    console.log("MAIL_USER:", process.env.MAIL_USER);
+    console.log(
+      "MAIL_PASS:",
+      process.env.MAIL_PASS ? "EXISTS" : "MISSING"
+    );
+    console.log("=================================");
+
     this.transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -14,6 +22,8 @@ export class MailService {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS,
       },
+      logger: true,
+      debug: true,
     });
 
     this.transporter.verify((error, success) => {
@@ -22,15 +32,6 @@ export class MailService {
       } else {
         console.log("SMTP Server is ready");
       }
-    });
-  }
-
-  async sendVerifyCode(email: string, code: string) {
-    await this.transporter.sendMail({
-      from: `"TaskUp" <${process.env.MAIL_USER}>`,
-      to: email,
-      subject: "Email verification",
-      html: `<h2>Your verification code: ${code}</h2>`,
     });
   }
   async sendForgotPassword(email: string, code: string) {
