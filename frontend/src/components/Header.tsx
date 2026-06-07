@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { RootState } from "../redux/store";
-import { logout, setLoggingOut } from "../redux/slices/currentUser";
+import { logout } from "../redux/slices/currentUser";
 import { callLogout } from "../services/auth";
 import { toastError } from "../lib/toast";
 import { CLOUDINARY_URL, BASE_URL } from "../constants";
@@ -155,10 +155,9 @@ const Header: React.FC = () => {
   const handleLogout = async () => {
     try {
       setIsDropdownOpen(false);
-      dispatch(setLoggingOut());
       dispatch(logout());
       await callLogout();
-      navigate("/login", { replace: true });
+      window.location.replace("/login");
     } catch (error: any) {
       toastError(error.message);
     }
