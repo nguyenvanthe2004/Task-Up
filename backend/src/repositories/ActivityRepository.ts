@@ -5,7 +5,7 @@ import { CreateActivityInput, UpdateActivityInput } from "../types/activityLog";
 
 @Service()
 export class ActivityRepository {
-  async findAll(taskId?: number) {
+  async findAll(taskId?: number, spaceId?: number) {
     const whereClause = taskId !== undefined ? { taskId } : {};
     return await Activity.findAll({
       where: whereClause,
@@ -19,21 +19,26 @@ export class ActivityRepository {
           model: Task,
           as: "task",
           attributes: ["id", "name"],
+          required: spaceId !== undefined,
           include: [
             {
               model: List,
               as: "list",
               attributes: ["id", "name"],
+              required: spaceId !== undefined,
               include: [
                 {
                   model: Category,
                   as: "category",
                   attributes: ["id", "name"],
+                  required: spaceId !== undefined,
                   include: [
                     {
                       model: Space,
                       as: "space",
                       attributes: ["id", "name"],
+                      required: spaceId !== undefined,
+                      ...(spaceId !== undefined ? { where: { id: spaceId } } : {}),
                       include: [
                         {
                           model: Workspace,

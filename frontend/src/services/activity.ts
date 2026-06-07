@@ -1,8 +1,11 @@
 import instance from "./req";
 
-export const callGetActivities = async (taskId?: number) => {
+export const callGetActivities = async (taskId?: number, spaceId?: number) => {
   return await instance.get("/activities", {
-    params: taskId !== undefined ? { taskId } : {},
+    params: {
+      ...(taskId !== undefined ? { taskId } : {}),
+      ...(spaceId !== undefined ? { spaceId } : {}),
+    },
   });
 };
 

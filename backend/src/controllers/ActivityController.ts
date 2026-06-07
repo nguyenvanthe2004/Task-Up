@@ -13,8 +13,11 @@ export class ActivityController {
   ) {}
 
   @Get("/")
-  async findAll(@QueryParam("taskId") taskId?: number) {
-    return await this.activityService.findAll(taskId);
+  async findAll(
+    @QueryParam("taskId") taskId?: number,
+    @QueryParam("spaceId") spaceId?: number,
+  ) {
+    return await this.activityService.findAll(taskId, spaceId);
   }
 
   @Get("/recent")

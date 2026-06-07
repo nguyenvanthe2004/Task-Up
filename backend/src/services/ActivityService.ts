@@ -20,8 +20,8 @@ export class ActivityService {
     private readonly notificationService: NotificationService,
   ) {}
 
-  async findAll(taskId?: number) {
-    const activities = await this.activityRepo.findAll(taskId);
+  async findAll(taskId?: number, spaceId?: number) {
+    const activities = await this.activityRepo.findAll(taskId, spaceId);
     return activities.map((c) => c.get({ plain: true }));
   }
 

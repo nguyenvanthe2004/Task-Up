@@ -23,8 +23,8 @@ export class AttachmentService {
     private readonly socketService: SocketService,
   ) {}
 
-  async findByTaskId(taskId?: number) {
-    const attachments = await this.attachmentRepo.findByTaskId(taskId);
+  async findByTaskId(taskId?: number, spaceId?: number) {
+    const attachments = await this.attachmentRepo.findByTaskId(taskId, spaceId);
     return attachments.map((a) => a.get({ plain: true }));
   }
 

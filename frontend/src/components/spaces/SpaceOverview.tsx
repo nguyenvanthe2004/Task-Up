@@ -57,8 +57,8 @@ const SpaceOverview: React.FC = () => {
         const [spaceRes, taskRes, actRes, atmRes] = await Promise.allSettled([
           callGetSpaceById(Number(spaceId)),
           callGetTasksBySpace(Number(spaceId)),
-          callGetActivities(),
-          callGetAttachments(),
+          callGetActivities(undefined, Number(spaceId)),
+          callGetAttachments(undefined, Number(spaceId)),
         ]);
 
         if (spaceRes.status === "fulfilled") setSpace(spaceRes.value.data);
@@ -77,25 +77,9 @@ const SpaceOverview: React.FC = () => {
           setStatuses(uniqueStatuses);
         }
 
-        if (actRes.status === "fulfilled") {
-          const all: Activity[] = actRes.value.data;
-          setActivities(
-            all.filter(
-              (a) =>
-                String((a as any).task?.list?.category?.space?.id) === String(spaceId),
-            ),
-          );
-        }
+        if (actRes.status === "fulfilled") setActivities(actRes.value.data);
 
-        if (atmRes.status === "fulfilled") {
-          const all: Attachment[] = atmRes.value.data;
-          setAttachments(
-            all.filter(
-              (a) =>
-                String((a.task as any)?.list?.category?.space?.id) === String(spaceId),
-            ),
-          );
-        }
+        if (atmRes.status === "fulfilled") setAttachments(atmRes.value.data);
       } catch (error: any) {
         toastError(error.message);
       } finally {

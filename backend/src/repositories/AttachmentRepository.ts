@@ -4,7 +4,7 @@ import { CreateAttachmentInput } from "../types/attachment";
 
 @Service()
 export class AttachmentRepository {
-  async findByTaskId(taskId?: number) {
+  async findByTaskId(taskId?: number, spaceId?: number) {
     const whereClause = taskId !== undefined ? { taskId } : {};
     return await Attachment.findAll({
       where: whereClause,
@@ -18,21 +18,26 @@ export class AttachmentRepository {
           model: Task,
           as: "task",
           attributes: ["id", "name"],
+          required: spaceId !== undefined,
           include: [
             {
               model: List,
               as: "list",
               attributes: ["id", "name"],
+              required: spaceId !== undefined,
               include: [
                 {
                   model: Category,
                   as: "category",
                   attributes: ["id", "name"],
+                  required: spaceId !== undefined,
                   include: [
                     {
                       model: Space,
                       as: "space",
                       attributes: ["id", "name"],
+                      required: spaceId !== undefined,
+                      ...(spaceId !== undefined ? { where: { id: spaceId } } : {}),
                       include: [
                         {
                           model: Workspace,

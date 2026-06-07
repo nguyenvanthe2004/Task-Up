@@ -1,7 +1,12 @@
 import instance from "./req";
 
-export const callGetAttachments = async (taskId?: number) => {
-  return await instance.get("/attachments", { params: { taskId } });
+export const callGetAttachments = async (taskId?: number, spaceId?: number) => {
+  return await instance.get("/attachments", {
+    params: {
+      ...(taskId !== undefined ? { taskId } : {}),
+      ...(spaceId !== undefined ? { spaceId } : {}),
+    },
+  });
 };
 
 export const callUploadAttachments = async (taskId: number, files: File[]) => {

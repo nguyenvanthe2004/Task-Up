@@ -21,8 +21,11 @@ export class AttachmentController {
   constructor(private readonly attachmentService: AttachmentService) {}
 
   @Get("/")
-  async findByTaskId(@QueryParam("taskId") taskId?: number) {
-    return await this.attachmentService.findByTaskId(taskId);
+  async findByTaskId(
+    @QueryParam("taskId") taskId?: number,
+    @QueryParam("spaceId") spaceId?: number,
+  ) {
+    return await this.attachmentService.findByTaskId(taskId, spaceId);
   }
 
   @Post("/upload/:taskId")
