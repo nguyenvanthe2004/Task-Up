@@ -128,7 +128,10 @@ const Header: React.FC = () => {
     setIsSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await callSearchTasks(value.trim(), workspaceId ? Number(workspaceId) : undefined);
+        const res = await callSearchTasks(
+          value.trim(),
+          workspaceId ? Number(workspaceId) : undefined,
+        );
         setSearchResults(res.data ?? []);
       } catch {
         setSearchResults([]);
@@ -146,23 +149,20 @@ const Header: React.FC = () => {
     const spaceId = task.list?.category?.space?.id;
     const categoryId = task.list?.category?.id;
     const listId = task.list?.id;
-    navigate(
-      `/${workspaceId}/spaces/${spaceId}/${categoryId}/${listId}`,
-    );
+    navigate(`/${workspaceId}/spaces/${spaceId}/${categoryId}/${listId}`);
   };
 
   const handleLogout = async () => {
-    try {
-      setIsDropdownOpen(false);
-      dispatch(logout());
-      await callLogout();
-      navigate("/login");
-    } catch (error: any) {
-      toastError(error.message);
-    }
-  };
+  try {
+    setIsDropdownOpen(false);
+    dispatch(logout());
+    await callLogout();
+    window.location.href = "/login"; 
+  } catch (error: any) {
+    toastError(error.message);
+  }
+};
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
   const priorityDotClass = (priority: string) => {
     switch (priority) {
       case "urgent":

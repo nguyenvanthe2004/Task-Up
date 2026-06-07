@@ -22,6 +22,7 @@ export const InlineEditCard: React.FC<{
   onSaved: (id: number, data: UpdateTask) => Promise<void>;
 }> = ({ task, members, statuses, onClose, onSaved }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -50,16 +51,25 @@ export const InlineEditCard: React.FC<{
   }, []);
 
   const onSubmit = async (data: UpdateTaskFormData) => {
-    await onSaved(task.id, {
-      ...data,
-      startDate: toISO(data.startDate),
-      dueDate: toISO(data.dueDate),
-    } as UpdateTask);
-    onClose();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await onSaved(task.id, {
+        ...data,
+        startDate: toISO(data.startDate),
+        dueDate: toISO(data.dueDate),
+      } as UpdateTask);
+      onClose();
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   return (
-    <div className="bg-white rounded-xl border-2 border-violet-300 shadow-lg p-3 space-y-2.5">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="bg-white rounded-xl border-2 border-violet-300 shadow-lg p-3 space-y-2.5"
+    >
       {/* Name */}
       <div>
         <input
@@ -272,7 +282,7 @@ export const InlineEditCard: React.FC<{
       {/* Actions */}
       <div className="flex items-center gap-2 pt-0.5">
         <button
-          onClick={handleSubmit(onSubmit)}
+          type="submit"
           disabled={isSubmitting}
           className="flex items-center gap-1 px-3 py-1.5 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[11px] font-bold rounded-lg transition-colors"
         >
@@ -300,12 +310,13 @@ export const InlineEditCard: React.FC<{
           Save
         </button>
         <button
+          type="button"
           onClick={onClose}
           className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-500 text-[11px] font-bold rounded-lg transition-colors"
         >
           Cancel
         </button>
       </div>
-    </div>
+    </form>
   );
 };

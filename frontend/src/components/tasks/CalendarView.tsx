@@ -40,7 +40,11 @@ import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
-const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
+const canViewTask = (
+  task: Task,
+  userId: number,
+  isOwner?: boolean,
+): boolean => {
   if (isTaskPublic(task)) return true;
   if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
@@ -50,7 +54,11 @@ const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => 
 };
 
 const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId, workspaceId } = useParams<{ listId: string; spaceId: string; workspaceId: string }>();
+  const { listId, spaceId, workspaceId } = useParams<{
+    listId: string;
+    spaceId: string;
+    workspaceId: string;
+  }>();
   const membersRef = useRef<Member[]>([]);
   const today = dayjs();
   const [current, setCurrent] = useState(today.date(1));
@@ -76,10 +84,14 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const user = useSelector((state: RootState) => state.auth.currentUser);
-  const isOwner = user?.workspaces?.some((w) => {
-    const oid = w.ownerId;
-    return w.id === Number(workspaceId) && (typeof oid === "object" ? oid?.id : oid) === user.id;
-  }) ?? false;
+  const isOwner =
+    user?.workspaces?.some((w) => {
+      const oid = w.ownerId;
+      return (
+        w.id === Number(workspaceId) &&
+        (typeof oid === "object" ? oid?.id : oid) === user.id
+      );
+    }) ?? false;
 
   const { isOpen, open, close } = useModal();
   const cells = buildCells(current);
@@ -133,7 +145,10 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
         const res = await callGetTasks(Number(listId));
         const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
         if (!newTask) return;
-        setTasks((prev) => [...prev, newTask]);
+        setTasks((prev) => {
+          if (prev.some((t) => t.id === newTask.id)) return prev;
+          return [...prev, newTask];
+        });
       } catch {}
     });
 

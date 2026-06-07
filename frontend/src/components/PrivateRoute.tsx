@@ -8,7 +8,7 @@ const PrivateRoute: React.FC<Props> = ({ isAuthenticated }) => {
   const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/landing" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

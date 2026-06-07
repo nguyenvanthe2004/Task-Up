@@ -26,6 +26,7 @@ export const InlineDayCreate: React.FC<{
   onCreated: () => void;
 }> = ({ date, statusId, listId, members, statuses, onClose, onCreated }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -54,24 +55,29 @@ export const InlineDayCreate: React.FC<{
   }, []);
 
   const onSubmit = async (data: CreateTaskFormData) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       await callCreateTask({
         ...data,
         listId: Number(listId),
         statusId,
         startDate: toISO(data.startDate),
-        dueDate: toISO(data.dueDate) ?? date, // fallback về date của cell
+        dueDate: toISO(data.dueDate) ?? date,
       } as any);
       toastSuccess("Task created!");
       reset();
       onCreated();
     } catch {
       toastError("Failed to create task.");
+    } finally {
+      submittingRef.current = false;
     }
   };
 
   return (
-    <div
+    <form
+      onSubmit={handleSubmit(onSubmit)}
       className="absolute inset-x-1 top-7 z-30 bg-white rounded-xl border-2 border-indigo-300 shadow-xl p-2.5 space-y-2"
       onClick={(e) => e.stopPropagation()}
     >
@@ -266,7 +272,7 @@ export const InlineDayCreate: React.FC<{
       {/* Actions */}
       <div className="flex gap-1.5">
         <button
-          onClick={handleSubmit(onSubmit)}
+          type="submit"
           disabled={isSubmitting}
           className="flex items-center gap-1 px-2.5 py-1 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
         >
@@ -294,12 +300,13 @@ export const InlineDayCreate: React.FC<{
           Add
         </button>
         <button
+          type="button"
           onClick={onClose}
           className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-500 text-[10px] font-bold rounded-lg transition-colors"
         >
           Cancel
         </button>
       </div>
-    </div>
+    </form>
   );
 };

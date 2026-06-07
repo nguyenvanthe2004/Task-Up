@@ -1,6 +1,5 @@
 import { Navigate, Outlet, useParams } from "react-router-dom";
 
-/** Chỉ cho phép workspaceId là số — tránh "/admin" bị match nhầm */
 const WorkspaceRoute: React.FC = () => {
   const { workspaceId } = useParams();
 

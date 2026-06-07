@@ -1,4 +1,10 @@
-import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import LandingPage from "./pages/landing/LandingPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -45,7 +51,7 @@ function App() {
       const isOAuthCallback = window.location.pathname.startsWith("/oauth/");
 
       if (!isPublicPath && !isOAuthCallback) {
-        navigate("/landing");
+        navigate("/login");
       }
     } finally {
       setLoading(false);
@@ -95,7 +101,13 @@ function App() {
 
       <Route
         path="/"
-        element={<PrivateRoute isAuthenticated={isAuthenticated} />}
+        element={
+          isAuthenticated ? (
+            <PrivateRoute isAuthenticated={isAuthenticated} />
+          ) : (
+            <Navigate to="/landing" replace />
+          )
+        }
       >
         <Route index element={<HomePage />} />
         <Route path=":workspaceId" element={<WorkspaceRoute />}>

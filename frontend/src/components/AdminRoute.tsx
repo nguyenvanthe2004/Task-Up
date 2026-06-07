@@ -8,7 +8,7 @@ const AdminRoute: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.currentUser);
 
   if (!user?.id) {
-    return <Navigate to="/landing" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (!isAdminRole(user.role)) {

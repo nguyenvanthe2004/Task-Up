@@ -146,9 +146,20 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
       socket.emit("join", { userId: user.id });
     });
 
-    socket.on("task:created", async (_data: { taskId: number }) => {
+    socket.on("task:created", async (data: { taskId: number }) => {
       try {
-        await fetchData();
+        const res = await callGetTasks(Number(listId));
+        const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
+        if (!newTask) return;
+        setGroups((prev) => {
+          if (prev.some((g) => g.tasks.some((t) => t.id === newTask.id)))
+            return prev;
+          return prev.map((g) =>
+            g.status.id === newTask.statusId
+              ? { ...g, tasks: [...g.tasks, newTask] }
+              : g,
+          );
+        });
       } catch {}
     });
 

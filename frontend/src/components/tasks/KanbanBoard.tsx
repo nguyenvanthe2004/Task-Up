@@ -32,7 +32,11 @@ import { io } from "socket.io-client";
 
 const isTaskPublic = (task: Task): boolean => Boolean(task.isPublic);
 
-const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => {
+const canViewTask = (
+  task: Task,
+  userId: number,
+  isOwner?: boolean,
+): boolean => {
   if (isTaskPublic(task)) return true;
   if (isOwner) return true;
   const ownerId = task.list?.category?.space?.workspace?.ownerId;
@@ -42,12 +46,20 @@ const canViewTask = (task: Task, userId: number, isOwner?: boolean): boolean => 
 };
 
 const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
-  const { listId, spaceId, workspaceId } = useParams<{ listId: string; spaceId: string; workspaceId: string }>();
+  const { listId, spaceId, workspaceId } = useParams<{
+    listId: string;
+    spaceId: string;
+    workspaceId: string;
+  }>();
   const user = useSelector((state: RootState) => state.auth.currentUser);
-  const isOwner = user?.workspaces?.some((w) => {
-    const oid = w.ownerId;
-    return w.id === Number(workspaceId) && (typeof oid === "object" ? oid?.id : oid) === user.id;
-  }) ?? false;
+  const isOwner =
+    user?.workspaces?.some((w) => {
+      const oid = w.ownerId;
+      return (
+        w.id === Number(workspaceId) &&
+        (typeof oid === "object" ? oid?.id : oid) === user.id
+      );
+    }) ?? false;
 
   const [groups, setGroups] = useState<{ status: Status; tasks: Task[] }[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -139,13 +151,15 @@ const KanbanBoard = forwardRef<ListViewHandle>((_, ref) => {
         const res = await callGetTasks(Number(listId));
         const newTask = (res.data as Task[]).find((t) => t.id === data.taskId);
         if (!newTask) return;
-        setGroups((prev) =>
-          prev.map((g) =>
+        setGroups((prev) => {
+          if (prev.some((g) => g.tasks.some((t) => t.id === newTask.id)))
+            return prev;
+          return prev.map((g) =>
             g.status.id === newTask.statusId
               ? { ...g, tasks: [...g.tasks, newTask] }
               : g,
-          ),
-        );
+          );
+        });
       } catch {}
     });
 

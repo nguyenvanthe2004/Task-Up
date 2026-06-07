@@ -22,6 +22,7 @@ export const InlineDayEdit: React.FC<{
   onSaved: (id: number, data: UpdateTask) => Promise<void>;
 }> = ({ task, statuses, members, onClose, onSaved }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -50,16 +51,23 @@ export const InlineDayEdit: React.FC<{
   }, []);
 
   const onSubmit = async (data: UpdateTaskFormData) => {
-    await onSaved(task.id, {
-      ...data,
-      startDate: toISO(data.startDate),
-      dueDate: toISO(data.dueDate),
-    } as UpdateTask);
-    onClose();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await onSaved(task.id, {
+        ...data,
+        startDate: toISO(data.startDate),
+        dueDate: toISO(data.dueDate),
+      } as UpdateTask);
+      onClose();
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   return (
-    <div
+    <form
+      onSubmit={handleSubmit(onSubmit)}
       className="absolute inset-x-1 top-7 z-30 bg-white rounded-xl border-2 border-violet-300 shadow-xl p-2.5 space-y-2"
       onClick={(e) => e.stopPropagation()}
     >
@@ -260,7 +268,7 @@ export const InlineDayEdit: React.FC<{
       {/* Actions */}
       <div className="flex gap-1.5">
         <button
-          onClick={handleSubmit(onSubmit)}
+          type="submit"
           disabled={isSubmitting}
           className="flex items-center gap-1 px-2.5 py-1 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
         >
@@ -288,12 +296,13 @@ export const InlineDayEdit: React.FC<{
           Save
         </button>
         <button
+          type="button"
           onClick={onClose}
           className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-500 text-[10px] font-bold rounded-lg transition-colors"
         >
           Cancel
         </button>
       </div>
-    </div>
+    </form>
   );
 };
