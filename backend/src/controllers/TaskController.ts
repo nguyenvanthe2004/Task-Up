@@ -26,8 +26,9 @@ export class TaskController {
   async findAll(
     @QueryParam("listId") listId?: number,
     @QueryParam("statusId") statusId?: number,
+    @QueryParam("spaceId") spaceId?: number,
   ) {
-    return await this.taskService.findAll(listId, statusId);
+    return await this.taskService.findAll(listId, statusId, spaceId);
   }
   @Get("/by-user")
   async findByUser(

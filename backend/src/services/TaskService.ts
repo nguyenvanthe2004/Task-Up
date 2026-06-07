@@ -65,8 +65,8 @@ export class TaskService {
     return await this.taskRepo.countBySpace(listId);
   }
 
-  async findAll(listId?: number, statusId?: number) {
-    const tasks: Task[] = await this.taskRepo.findAll(listId, statusId);
+  async findAll(listId?: number, statusId?: number, spaceId?: number) {
+    const tasks: Task[] = await this.taskRepo.findAll(listId, statusId, spaceId);
     return tasks.map((task) => task.get({ plain: true }));
   }
 

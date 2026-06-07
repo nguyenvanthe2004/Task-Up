@@ -90,20 +90,33 @@ const SpaceOverview: React.FC = () => {
     fetchAll();
   }, [spaceId]);
 
+  const DONE_NAMES = [
+    "done",
+    "completed",
+    "complete",
+    "closed",
+    "finished",
+    "finish",
+  ];
+  const isDone = (t: Task) =>
+    DONE_NAMES.some((kw) =>
+      (t.status as any)?.name?.toLowerCase().includes(kw),
+    );
+
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(
-    (t) => (t.status as any)?.name?.toLowerCase() === "done",
-  ).length;
+  const completedTasks = tasks.filter(isDone).length;
   const completionPct =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const overdueTasks = tasks.filter(
+    (t) => !isDone(t) && t.dueDate && new Date(t.dueDate) < new Date(),
+  ).length;
 
   const urgentTasks = tasks.filter(
     (t) => t.priority === "urgent" || t.priority === "high",
   ).length;
 
-  const activeTasks = tasks.filter(
-    (t) => (t.status as any)?.name?.toLowerCase() !== "done",
-  ).length;
+  const activeTasks = tasks.filter((t) => !isDone(t)).length;
 
   const memberCount = space?.members?.length ?? 0;
 
@@ -201,19 +214,21 @@ const SpaceOverview: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Active Tasks */}
+                {/* Overdue */}
                 <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
                   <div className="flex justify-between items-start">
                     <span className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider">
-                      Active Tasks
+                      Overdue
                     </span>
-                    <span className="material-symbols-outlined text-tertiary text-sm">
-                      assignment_turned_in
+                    <span className="material-symbols-outlined text-red-400 text-sm">
+                      event_busy
                     </span>
                   </div>
                   <div className="mt-4">
-                    <span className="text-2xl font-black text-on-surface">
-                      {activeTasks}
+                    <span
+                      className={`text-2xl font-black ${overdueTasks > 0 ? "text-red-500" : "text-on-surface"}`}
+                    >
+                      {overdueTasks}
                     </span>
                     <p className="text-[0.6875rem] text-on-surface-variant font-medium mt-1">
                       {urgentTasks > 0
@@ -307,14 +322,10 @@ const SpaceOverview: React.FC = () => {
                   </div>
 
                   {(() => {
-                    const doneTasks = tasks
-                      .filter(
-                        (t) =>
-                          (t.status as any)?.name?.toLowerCase() === "done",
-                      )
-                      .slice(0, 5);
+                    const doneTasks = tasks.filter(isDone);
+                    const previewTasks = doneTasks.slice(0, 5);
 
-                    if (doneTasks.length === 0)
+                    if (previewTasks.length === 0)
                       return (
                         <div className="p-12 flex flex-col items-center text-center text-on-surface-variant">
                           <span className="material-symbols-outlined text-4xl mb-3 text-slate-200">
@@ -345,10 +356,11 @@ const SpaceOverview: React.FC = () => {
                         </div>
 
                         <div className="divide-y divide-slate-50">
-                          {doneTasks.map((task) => {
+                          {previewTasks.map((task) => {
                             const statusColor =
                               (task.status as any)?.color ?? "#6366f1";
                             const priority = task.priority ?? "normal";
+                            const isDoneTask = isDone(task);
                             const isOverdue =
                               task.dueDate &&
                               new Date(task.dueDate) < new Date();
@@ -370,7 +382,11 @@ const SpaceOverview: React.FC = () => {
                                 <div className="min-w-0 pr-4">
                                   <p
                                     onClick={() => setSelectedTask(task)}
-                                    className="text-[0.8125rem] font-semibold truncate text-on-surface-variant"
+                                    className={`text-[0.8125rem] font-semibold truncate ${
+                                      isDoneTask
+                                        ? ""
+                                        : "text-on-surface-variant"
+                                    }`}
                                   >
                                     {task.name}
                                   </p>
@@ -381,18 +397,17 @@ const SpaceOverview: React.FC = () => {
                                 </span>
 
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[0.6875rem] font-medium ${isOverdue ? "text-red-500" : "text-on-surface-variant"}`}
+                                  className={`inline-flex items-center gap-1 text-[0.6875rem] font-medium ${isOverdue && !isDoneTask ? "text-red-500" : "text-on-surface-variant"}`}
                                 >
                                   <span className="material-symbols-outlined text-[13px]">
-                                    {isOverdue ? "event_busy" : "event"}
+                                    {isOverdue && !isDoneTask
+                                      ? "event_busy"
+                                      : "event"}
                                   </span>
                                   {task.dueDate
                                     ? new Date(task.dueDate).toLocaleDateString(
                                         "en-US",
-                                        {
-                                          month: "short",
-                                          day: "numeric",
-                                        },
+                                        { month: "short", day: "numeric" },
                                       )
                                     : "—"}
                                 </span>
@@ -406,26 +421,6 @@ const SpaceOverview: React.FC = () => {
                             );
                           })}
                         </div>
-
-                        {tasks.filter(
-                          (t) =>
-                            (t.status as any)?.name?.toLowerCase() === "done",
-                        ).length > 5 && (
-                          <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50">
-                            <button
-                              onClick={() => onClick("list")}
-                              className="text-[0.6875rem] font-bold text-primary hover:underline"
-                            >
-                              +
-                              {tasks.filter(
-                                (t) =>
-                                  (t.status as any)?.name?.toLowerCase() ===
-                                  "done",
-                              ).length - 5}{" "}
-                              more → View full list
-                            </button>
-                          </div>
-                        )}
                       </>
                     );
                   })()}

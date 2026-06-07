@@ -59,7 +59,7 @@ export class TaskRepository {
     });
   }
 
-  async findAll(listId?: number, statusId?: number) {
+  async findAll(listId?: number, statusId?: number, spaceId?: number) {
     const whereClause = {
       ...(listId !== undefined && { listId }),
       ...(statusId !== undefined && { statusId }),
@@ -75,22 +75,26 @@ export class TaskRepository {
         {
           model: Status,
           as: "status",
-          attributes: ["id", "name", "color"],
+          attributes: ["id", "name", "color", "position"],
         },
         {
           model: List,
           as: "list",
           attributes: ["id", "name"],
+          required: spaceId !== undefined,
           include: [
             {
               model: Category,
               as: "category",
               attributes: ["id", "name"],
+              required: spaceId !== undefined,
               include: [
                 {
                   model: Space,
                   as: "space",
                   attributes: ["id", "name"],
+                  required: spaceId !== undefined,
+                  ...(spaceId !== undefined ? { where: { id: spaceId } } : {}),
                   include: [
                     {
                       model: Workspace,
