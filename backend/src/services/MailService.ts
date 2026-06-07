@@ -1,6 +1,10 @@
 import { Service } from "typedi";
 import nodemailer from "nodemailer";
+import dns from "dns";
 
+dns.lookup("smtp-relay.brevo.com", { all: true }, (err, addresses) => {
+  console.log("DNS:", err || addresses);
+});
 @Service()
 export class MailService {
   private transporter: nodemailer.Transporter;
@@ -10,7 +14,7 @@ export class MailService {
     console.log("BREVO_PASS =", process.env.BREVO_PASS ? "EXISTS" : "MISSING");
     this.transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com",
-      port: 587,
+      port: 2525,
       secure: false,
       auth: {
         user: process.env.BREVO_USER,
