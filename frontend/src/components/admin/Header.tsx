@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 
 const pageTitles: Record<string, string> = {
-  "/admin": "Quản lý người dùng",
+  "/admin": "User Management",
 };
 
 interface HeaderProps {
@@ -37,7 +37,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <Search className="w-4 h-4 shrink-0" />
           <input
             type="text"
-            placeholder="Tìm kiếm chứng chỉ, người dùng..."
+            placeholder="Search for users..."
             className="w-full pr-4 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
           />
         </div>

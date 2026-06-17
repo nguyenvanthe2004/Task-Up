@@ -10,6 +10,7 @@ import {
   Put,
   CurrentUser,
   QueryParam,
+  Delete,
 } from "routing-controllers";
 import { Service } from "typedi";
 import { UserService } from "../services/UserService";
@@ -88,6 +89,11 @@ export class UserController {
     return this.userService.verifyEmail(data.email, data.code);
   }
 
+  @Post("/logout")
+  async logout(@Res() res: Response) {
+    return await this.userService.logout(res);
+  }
+
   @Put("/profile")
   async updateProfile(
     @CurrentUser() user: UserProps,
@@ -125,8 +131,9 @@ export class UserController {
     return this.userService.updateRole(id, body.role, user, res);
   }
 
-  @Post("/logout")
-  async logout(@Res() res: Response) {
-    return await this.userService.logout(res);
+  @Authorized(UserRole.ADMIN)
+  @Delete("/:id")
+  async deleteUser(@Param("id") id: number, @CurrentUser() user: UserProps) {
+    return this.userService.deleteUser(id, user);
   }
 }

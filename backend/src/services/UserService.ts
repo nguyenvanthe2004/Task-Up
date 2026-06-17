@@ -289,7 +289,7 @@ export class UserService {
         message: "Verification code sent to email",
       };
     } catch (error) {
-      console.log("error", error)
+      console.log("error", error);
       throw new BadRequestError("Failed to register user");
     }
   }
@@ -391,5 +391,17 @@ export class UserService {
     const { password, verifyCode, ...rest } = plainUser;
 
     return rest;
+  }
+  async deleteUser(id: number, currentUser: UserProps) {
+    if (currentUser.id === id) {
+      throw new BadRequestError("Cannot delete your own account");
+    }
+
+    const user = await this.userRepo.findOne(id);
+    if (!user) throw new BadRequestError("User not found");
+
+    await this.userRepo.delete(id);
+
+    return { message: "User deleted successfully" };
   }
 }

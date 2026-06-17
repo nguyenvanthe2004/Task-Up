@@ -22,3 +22,7 @@ export const callGetUsers = async (page = 1, limit = 10) => {
 export const callUpdateUserRole = async (userId: number, role: UserRole) => {
   return await instance.put<AdminUser>(`/users/${userId}/role`, { role });
 };
+
+export const callDeleteUser = async (userId: number) => {
+  return await instance.delete(`/users/${userId}`);
+};

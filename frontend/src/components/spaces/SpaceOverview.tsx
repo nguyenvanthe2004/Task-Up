@@ -186,8 +186,9 @@ const SpaceOverview: React.FC = () => {
         {view === "overview" && (
           <>
             <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
+              <div className="col-span-12 lg:col-span-8 grid grid-cols-2 gap-4">
+                {/* Completion Rate - full width */}
+                <div className="col-span-2 bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
                   <div className="flex justify-between items-start">
                     <span className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider">
                       Completion Rate
@@ -215,7 +216,7 @@ const SpaceOverview: React.FC = () => {
                 </div>
 
                 {/* Overdue */}
-                <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
+                <div className="col-span-1 bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
                   <div className="flex justify-between items-start">
                     <span className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider">
                       Overdue
@@ -239,7 +240,7 @@ const SpaceOverview: React.FC = () => {
                 </div>
 
                 {/* Members */}
-                <div className="bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
+                <div className="col-span-1 bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between h-32">
                   <div className="flex justify-between items-start">
                     <span className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider">
                       Members

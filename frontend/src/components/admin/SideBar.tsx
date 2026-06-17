@@ -15,7 +15,7 @@ import { callLogout } from "../../services/auth";
 import { toastError } from "../../lib/toast";
 
 const navItems = [
-    { label: "Quản lý người dùng", icon: Users, path: "/admin" },
+    { label: "User Management", icon: Users, path: "/admin" },
 ];
 
 interface SidebarProps {
@@ -70,7 +70,7 @@ export default function Sidebar({
                             TaskUp
                         </h1>
                         <p className="text-[11px] text-slate-500 truncate font-medium">
-                            Quản lý Hệ Thống
+                            Domination System Management
                         </p>
                     </div>
                 )}
@@ -80,7 +80,7 @@ export default function Sidebar({
             <nav className="flex-1 py-4 px-3 overflow-y-auto">
                 {!collapsed && (
                     <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Menu chính
+                        Menu
                     </p>
                 )}
                 <div className="space-y-0.5">
@@ -121,14 +121,14 @@ export default function Sidebar({
                             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50">
                                 <Activity className="w-3.5 h-3.5 text-emerald-600" />
                             </span>
-                            <span className="font-medium">Hệ thống hoạt động</span>
+                            <span className="font-medium">The system works</span>
                             <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-600">
                             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50">
                                 <Server className="w-3.5 h-3.5 text-blue-600" />
                             </span>
-                            <span className="font-medium">Máy chủ ổn định</span>
+                            <span className="font-medium">Stable server</span>
                         </div>
                     </div>
                 )}
@@ -140,7 +140,7 @@ export default function Sidebar({
             ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5"}`}
                 >
                     <LogOut className="w-4 h-4 shrink-0" />
-                    {!collapsed && <span>Đăng xuất</span>}
+                    {!collapsed && <span>Log out</span>}
                 </button>
             </div>
 

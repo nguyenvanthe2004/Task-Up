@@ -8,6 +8,7 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
 import { UserRole } from "../../../constants";
@@ -17,10 +18,12 @@ import { normalizeImg } from "../../../lib/until";
 import { RootState } from "../../../redux/store";
 import {
   AdminUser,
+  callDeleteUser,
   callGetUsers,
   callUpdateUserRole,
 } from "../../../services/user";
 import LoadingPage from "../../ui/LoadingPage";
+import ConfirmDeleteModal from "../../ui/ConfirmDeleteModal";
 
 const ROLE_OPTIONS = [
   { value: UserRole.USER, label: "User", icon: Users },
@@ -35,10 +38,11 @@ const roleBadgeClass: Record<string, string> = {
 const UserManager: React.FC = () => {
   const dispatch = useDispatch();
   const currentUser = useSelector((state: RootState) => state.auth.currentUser);
-
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -52,7 +56,7 @@ const UserManager: React.FC = () => {
       setUsers(list);
       setTotalPages(res.data.totalPages ?? 1);
     } catch (error: any) {
-      toastError(error.message ?? "Không thể tải danh sách người dùng");
+      toastError(error.message ?? "Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -75,7 +79,8 @@ const UserManager: React.FC = () => {
   const stats = useMemo(() => {
     const adminCount = users.filter((u) => u.role === UserRole.ADMIN).length;
     const activeCount = users.filter((u) => u.isActive !== false).length;
-    return { total: users.length, adminCount, activeCount };
+    const userCount = users.filter((u) => u.role === UserRole.USER).length;
+    return { total: users.length, adminCount, activeCount, userCount };
   }, [users]);
 
   const handleRoleChange = async (userId: number, role: UserRole) => {
@@ -83,7 +88,7 @@ const UserManager: React.FC = () => {
     if (!target || target.role === role) return;
 
     if (userId === currentUser?.id && role !== UserRole.ADMIN) {
-      toastError("Bạn không thể tự hạ quyền admin của chính mình");
+      toastError("You cannot demote your own admin role");
       return;
     }
 
@@ -101,38 +106,50 @@ const UserManager: React.FC = () => {
           ),
         );
       }
-      toastSuccess("Cập nhật quyền thành công");
+      toastSuccess("Role updated successfully");
     } catch (error: any) {
-      toastError(error.message ?? "Không thể cập nhật quyền");
+      toastError(error.message ?? "Failed to update role");
     } finally {
       setUpdatingId(null);
     }
   };
 
-  if (!isAdminRole(currentUser?.role)) {
-    return null;
-  }
+  const handleDelete = async () => {
+    if (!confirmDeleteId) return;
 
-  if (loading && users.length === 0) {
-    return <LoadingPage />;
-  }
+    const idToDelete = confirmDeleteId;
+
+    setDeletingId(idToDelete);
+    setConfirmDeleteId(null);
+    try {
+      await callDeleteUser(idToDelete);
+      setUsers((prev) => prev.filter((u) => u.id !== idToDelete));
+      toastSuccess("User deleted successfully");
+    } catch (error: any) {
+      toastError(error.message ?? "Failed to delete user");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (!isAdminRole(currentUser?.role)) return null;
+  if (loading && users.length === 0) return <LoadingPage />;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 w-full mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Shield className="w-5 h-5 text-blue-600" />
             <h2 className="text-xl font-semibold text-slate-900">
-              Quản lý người dùng
+              User Management
             </h2>
           </div>
           <p className="text-sm text-slate-500">
-            Phân quyền <span className="font-medium text-slate-700">User</span>{" "}
-            hoặc{" "}
-            <span className="font-medium text-blue-600">Admin</span> cho từng
-            tài khoản.
+            Assign <span className="font-medium text-slate-700">User</span> or{" "}
+            <span className="font-medium text-blue-600">Admin</span> roles to
+            each account.
           </p>
         </div>
         <button
@@ -142,7 +159,7 @@ const UserManager: React.FC = () => {
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
+          Refresh
         </button>
       </div>
 
@@ -150,23 +167,23 @@ const UserManager: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           {
-            label: "Trang hiện tại",
-            value: stats.total,
-            sub: `Trang ${page}/${totalPages}`,
-            color: "text-slate-900",
-            bg: "bg-white",
-          },
-          {
-            label: "Admin",
+            label: "Admins",
             value: stats.adminCount,
-            sub: "trên trang này",
+            sub: "on this page",
             color: "text-blue-600",
             bg: "bg-blue-50/50",
           },
           {
-            label: "Đã kích hoạt",
+            label: "Users",
+            value: stats.userCount,
+            sub: "on this page",
+            color: "text-slate-900",
+            bg: "bg-white",
+          },
+          {
+            label: "Activated",
             value: stats.activeCount,
-            sub: "trên trang này",
+            sub: "on this page",
             color: "text-emerald-600",
             bg: "bg-emerald-50/50",
           },
@@ -191,7 +208,7 @@ const UserManager: React.FC = () => {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo tên hoặc email..."
+          placeholder="Search by name or email..."
           className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
         />
       </div>
@@ -203,19 +220,22 @@ const UserManager: React.FC = () => {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">
-                  Người dùng
+                  User
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">
                   Email
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">
-                  Trạng thái
+                  Status
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">
-                  Vai trò
+                  Role
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">
-                  Phân quyền
+                  Assign Role
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">
+                  Action
                 </th>
               </tr>
             </thead>
@@ -223,10 +243,10 @@ const UserManager: React.FC = () => {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-slate-400"
                   >
-                    Không tìm thấy người dùng nào.
+                    No users found.
                   </td>
                 </tr>
               ) : (
@@ -234,6 +254,7 @@ const UserManager: React.FC = () => {
                   const isSelf = user.id === currentUser?.id;
                   const RoleIcon =
                     user.role === UserRole.ADMIN ? ShieldCheck : Users;
+                  const isDeleting = deletingId === user.id;
 
                   return (
                     <tr
@@ -260,7 +281,7 @@ const UserManager: React.FC = () => {
                               {user.fullName}
                               {isSelf && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600">
-                                  Bạn
+                                  You
                                 </span>
                               )}
                             </p>
@@ -288,9 +309,7 @@ const UserManager: React.FC = () => {
                                 : "bg-amber-500"
                             }`}
                           />
-                          {user.isActive !== false
-                            ? "Hoạt động"
-                            : "Chưa xác thực"}
+                          {user.isActive !== false ? "Active" : "Unverified"}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -323,6 +342,23 @@ const UserManager: React.FC = () => {
                           ))}
                         </select>
                       </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          disabled={isSelf || isDeleting}
+                          onClick={() => setConfirmDeleteId(user.id)}
+                          title={
+                            isSelf
+                              ? "Cannot delete your own account"
+                              : "Delete user"
+                          }
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                        >
+                          <Trash2
+                            className={`w-4 h-4 ${isDeleting ? "animate-pulse" : ""}`}
+                          />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -335,7 +371,7 @@ const UserManager: React.FC = () => {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
             <p className="text-xs text-slate-500">
-              Trang {page} / {totalPages}
+              Page {page} / {totalPages}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -358,6 +394,17 @@ const UserManager: React.FC = () => {
           </div>
         )}
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleDelete}
+        loading={deletingId !== null}
+        title="Delete User"
+        description={`Are you sure you want to delete "${users.find((u) => u.id === confirmDeleteId)?.fullName ?? ""}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

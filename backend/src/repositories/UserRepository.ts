@@ -52,4 +52,7 @@ export class UserRepository {
 
     return await User.findByPk(id);
   }
+  async delete(id: number) {
+    return await User.destroy({ where: { id } });
+  }
 }
