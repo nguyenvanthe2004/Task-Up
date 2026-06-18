@@ -113,11 +113,6 @@ export class WorkspaceService {
       throw new BadRequestError("Only the workspace owner can invite members");
     }
 
-    // Prevent inviting yourself
-    if (email.toLowerCase() === user.email.toLowerCase()) {
-      throw new BadRequestError("You cannot invite yourself");
-    }
-
     // Check if the email belongs to an existing user who is already a member
     const targetUser = await this.userRepo.findByEmail(email);
     if (targetUser) {
@@ -145,43 +140,44 @@ export class WorkspaceService {
   }
 
   async acceptInvite(inviteToken: string) {
-    const payload = verifyInviteToken(inviteToken);
+    try {
+      const payload = verifyInviteToken(inviteToken);
 
-    if (!payload) {
-      throw new BadRequestError("Invalid or expired invite link");
+      if (!payload) {
+        throw new BadRequestError("Invalid or expired invite link");
+      }
+
+      const receiveResult = await this.userRepo.findByEmail(payload.email);
+      const receiveUser = receiveResult!.get({ plain: true });
+
+      const alreadyMember = await this.workspaceRepo.checkUserInWorkspace(
+        payload.workspaceId,
+        receiveUser.id,
+      );
+
+      if (alreadyMember) {
+        throw new BadRequestError("You are already a member of this workspace");
+      }
+
+      const workspace = await this.workspaceRepo.findOne(payload.workspaceId);
+      if (!workspace) {
+        throw new NotFoundError("The workspace no longer exists");
+      }
+
+      await this.workspaceRepo.addMember(
+        payload.workspaceId,
+        receiveUser.id,
+        WorkspaceRole.MEMBER,
+        payload.invitedBy,
+      );
+
+      return {
+        message: "Joined workspace successfully",
+        workspaceId: payload.workspaceId,
+      };
+    } catch (err: any) {
+      console.log(err);
     }
-
-    const receiveResult = await this.userRepo
-      .findByEmail(payload.email)
-    const receiveUser = receiveResult!.get({ plain: true });
-
-    // Prevent duplicate membership
-    const alreadyMember = await this.workspaceRepo.checkUserInWorkspace(
-      payload.workspaceId,
-      receiveUser.id,
-    );
-
-    if (alreadyMember) {
-      throw new BadRequestError("You are already a member of this workspace");
-    }
-
-    // Ensure the workspace still exists
-    const workspace = await this.workspaceRepo.findOne(payload.workspaceId);
-    if (!workspace) {
-      throw new NotFoundError("The workspace no longer exists");
-    }
-
-    await this.workspaceRepo.addMember(
-      payload.workspaceId,
-      receiveUser.id,
-      WorkspaceRole.MEMBER,
-      payload.invitedBy,
-    );
-
-    return {
-      message: "Joined workspace successfully",
-      workspaceId: payload.workspaceId,
-    };
   }
 
   async update(id: number, data: UpdateWorkSpaceInput, user: UserProps) {

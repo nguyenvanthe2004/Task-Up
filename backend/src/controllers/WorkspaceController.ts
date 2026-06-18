@@ -84,7 +84,8 @@ export class WorkspaceController {
   async acceptInvite(
     @Body() body: { token: string },
   ) {
-    return await this.workspaceService.acceptInvite(body.token, user);
+    console.log(1231231)
+    return await this.workspaceService.acceptInvite(body.token);
   }
 
   @Put("/:id")
