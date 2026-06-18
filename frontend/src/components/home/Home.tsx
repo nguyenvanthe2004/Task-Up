@@ -21,6 +21,7 @@ import { callGetLatestNotifications } from "../../services/notifications";
 import NotificationList from "./NotificationList";
 import SpaceProgress from "./SpaceProgress";
 import { Notification } from "../../types/notification";
+import { RootState } from "../../redux/store";
 
 const Home: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -35,7 +36,7 @@ const Home: React.FC = () => {
   const [openCreate, setOpenCreate] = useState(true);
   const navigate = useNavigate();
   const { workspaceId } = useParams();
-  const user = useSelector((state: any) => state.auth.currentUser);
+  const user = useSelector((state: RootState) => state.auth.currentUser);
 
   useEffect(() => {
     const fetchWorkspaces = async () => {
@@ -57,6 +58,7 @@ const Home: React.FC = () => {
 
     const fetchWorkspaceData = async () => {
       try {
+        setLoading(true);
         const [taskRes, summaryRes, actRes, atmRes, spaceRes, notiRes] =
           await Promise.allSettled([
             callGetTaskByUser(user.id),

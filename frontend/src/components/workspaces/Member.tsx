@@ -13,6 +13,7 @@ import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
 import { Trash } from "lucide-react";
 import { useModal } from "../../hook/useModal";
 import { UserWorkspace } from "../../types/workspace";
+import LoadingPage from "../ui/LoadingPage";
 
 const Member: React.FC = () => {
   const [members, setMembers] = useState<UserWithWorkSpace[]>([]);
@@ -22,6 +23,7 @@ const Member: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteBy, setInviteBy] = useState("");
+  const [loading, setLoading] = useState(true);
   const { workspaceId } = useParams();
   const [deleting, setDeleting] = useState(false);
   const { isOpen, open, close } = useModal();
@@ -34,11 +36,14 @@ const Member: React.FC = () => {
   });
   const fetchMembers = async () => {
     try {
+      setLoading(true);
       const res = await callGetMembers(Number(workspaceId));
       setInviteBy(res.data.userWorkspaces.find((uw: UserWorkspace) => uw.invitedBy !== null)?.inviter?.email ?? "");
       setMembers(res.data.users);
     } catch (error: any) {
       toastError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -272,9 +277,9 @@ const Member: React.FC = () => {
                 ))}
               </tbody>
             </table>
-            {filtered.length === 0 && (
+            {filtered.length === 0 && loading && (
               <div className="text-center py-12 text-gray-400 text-sm">
-                No members found.
+                <LoadingPage />
               </div>
             )}
           </div>

@@ -92,7 +92,6 @@ function App() {
       dispatch(setIsLogout(false));
     }
   }, [])
-  if (loading) return <LoadingPage />;
 
   return (
     <Routes>

@@ -20,6 +20,7 @@ import { Status } from "../../types/status";
 import { priorityBadge } from "../../constants";
 import { fmtDate } from "../../lib/until";
 import StatusManager from "../lists/StattusManager";
+import LoadingPage from "../ui/LoadingPage";
 
 type SpaceView = "overview" | "list" | "kanban" | "calendar";
 
@@ -126,6 +127,8 @@ const SpaceOverview: React.FC = () => {
     { key: "kanban", icon: "view_kanban", label: "Board" },
     { key: "calendar", icon: "calendar_month", label: "Calendar" },
   ];
+
+  if (loading) return <LoadingPage />;
   return (
     <main className="min-h-screen flex flex-col">
       <div className="p-8 max-w-8xl mx-auto w-full">

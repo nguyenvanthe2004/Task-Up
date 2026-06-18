@@ -20,7 +20,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import { callAcceptInvite } from "../../services/workspace";
-import { WORKSPACE_JOINED_EVENT } from "../SideBar";
 
 export const PENDING_INVITE_TOKEN_KEY = "pendingInviteToken";
 
@@ -35,19 +34,13 @@ const useAcceptInvite = () => {
     if (!token || handledRef.current) return;
     handledRef.current = true;
 
-    if (!currentUser) {
-      sessionStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
-      navigate("/login", { replace: true });
-      return;
-    }
-
     const accept = async () => {
       try {
         const res = await callAcceptInvite(token);
         const workspaceId = res.data?.workspaceId;
-        window.dispatchEvent(
-          new CustomEvent(WORKSPACE_JOINED_EVENT, { detail: { workspaceId } }),
-        );
+        // window.dispatchEvent(
+        //   new CustomEvent(WORKSPACE_JOINED_EVENT, { detail: { workspaceId } }),
+        // );
         if (workspaceId) navigate(`/${workspaceId}`, { replace: true });
       } catch {
         navigate("/", { replace: true });
