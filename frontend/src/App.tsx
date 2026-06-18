@@ -93,6 +93,8 @@ function App() {
     }
   }, [])
 
+  if (loading) return <LoadingPage />;
+
   return (
     <Routes>
       <Route path="/landing" element={<LandingPage />} />
