@@ -105,7 +105,7 @@ function App() {
           isAuthenticated ? (
             <PrivateRoute isAuthenticated={isAuthenticated} />
           ) : (
-            <Navigate to="/landing" replace />
+            <Navigate to="/login" replace />
           )
         }
       >

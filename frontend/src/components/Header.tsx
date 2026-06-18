@@ -155,9 +155,9 @@ const Header: React.FC = () => {
   const handleLogout = async () => {
     try {
       setIsDropdownOpen(false);
-      dispatch(logout());
       await callLogout();
-      window.location.replace("/login");
+      dispatch(logout());
+      // navigate("/login");
     } catch (error: any) {
       toastError(error.message);
     }

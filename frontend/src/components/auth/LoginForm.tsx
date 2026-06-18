@@ -52,7 +52,6 @@ const LoginForm: React.FC = () => {
     try {
       const { data } = await callLogin(dto);
       dispatch(setCurrentUser(data.user));
-      toastSuccess("Login successfully");
 
       const joinedWorkspaceId = await handlePendingInvite();
       if (joinedWorkspaceId) {
