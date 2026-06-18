@@ -13,6 +13,7 @@ const initialState: CurrentUserState = {
     avatar: "",
     workspaces: [],
   },
+  isLogout: false,
 };
 
 export const currentUserSlice = createSlice({
@@ -32,6 +33,9 @@ export const currentUserSlice = createSlice({
         avatar: "",
       };
     },
+    setIsLogout: (state, action: PayloadAction<boolean>) => {
+      state.isLogout = action.payload;
+    },
     addWorkspace: (state, action: PayloadAction<Workspace>) => {
       if (state.currentUser) {
         state.currentUser.workspaces = [
@@ -43,5 +47,6 @@ export const currentUserSlice = createSlice({
   },
 });
 
-export const { setCurrentUser, logout, addWorkspace } = currentUserSlice.actions;
+export const { setCurrentUser, logout, setIsLogout, addWorkspace } =
+  currentUserSlice.actions;
 export default currentUserSlice.reducer;

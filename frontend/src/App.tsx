@@ -10,7 +10,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import { useEffect, useState } from "react";
 import { callGetCurrentUser } from "./services/auth";
-import { logout, setCurrentUser } from "./redux/slices/currentUser";
+import { logout, setCurrentUser, setIsLogout } from "./redux/slices/currentUser";
 import { useDispatch, useSelector } from "react-redux";
 import GithubCallback from "./components/auth/GitHubCallBack";
 import HomePage from "./pages/home/HomePage";
@@ -36,6 +36,7 @@ function App() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const currentUser = useSelector((state: RootState) => state.auth.currentUser);
+  const isLogout = useSelector((state: RootState) => state.auth.isLogout);
   const isAuthenticated = Boolean(currentUser?.id);
   const fetchCurrentUser = async () => {
     try {
@@ -86,6 +87,11 @@ function App() {
     navigate,
   ]);
 
+  useEffect(() => {
+    if(!isAuthenticated) {
+      dispatch(setIsLogout(false));
+    }
+  }, [])
   if (loading) return <LoadingPage />;
 
   return (
@@ -104,8 +110,10 @@ function App() {
         element={
           isAuthenticated ? (
             <PrivateRoute isAuthenticated={isAuthenticated} />
-          ) : (
+          ) : isLogout ? (
             <Navigate to="/login" replace />
+          ) : (
+            <Navigate to="/landing" replace />
           )
         }
       >

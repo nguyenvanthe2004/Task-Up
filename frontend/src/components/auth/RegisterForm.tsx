@@ -47,8 +47,6 @@ export default function Register() {
         email: data.email,
         password: data.password,
       });
-
-      toastSuccess("Verification code sent to your email");
       setEmailForVerify(data.email);
       setShowCodeInput(true);
     } catch (err: any) {
@@ -86,7 +84,6 @@ export default function Register() {
       const res = await callLoginGoogle(credentialResponse.credential);
       const user = normalizeAuthUser(res.data.user);
       dispatch(setCurrentUser(user));
-      toastSuccess("Login successfully");
       navigate(getPostLoginPath(user));
     } catch (error: any) {
       toastError(error.message);

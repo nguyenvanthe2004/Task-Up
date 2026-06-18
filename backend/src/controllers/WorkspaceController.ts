@@ -14,6 +14,7 @@ import { Service } from "typedi";
 import { CreateWorkSpaceInput, UpdateWorkSpaceInput } from "../types/workspace";
 import { UserProps } from "../types/auth";
 import { WorkspaceService } from "../services/WorkspaceService";
+import { Public } from "../decorators/public";
 
 @Service()
 @JsonController("/workspaces")
@@ -64,6 +65,7 @@ export class WorkspaceController {
     return await this.workspaceService.create(user, data);
   }
 
+
   @Post("/:id/invite")
   async inviteMember(
     @Param("id") workspaceId: number,
@@ -77,10 +79,10 @@ export class WorkspaceController {
     );
   }
 
+  @Public()
   @Post("/accept-invite")
   async acceptInvite(
     @Body() body: { token: string },
-    @CurrentUser() user: UserProps,
   ) {
     return await this.workspaceService.acceptInvite(body.token, user);
   }

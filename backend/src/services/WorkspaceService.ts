@@ -127,7 +127,9 @@ export class WorkspaceService {
       );
 
       if (alreadyMember) {
-        throw new BadRequestError("This user is already a member of the workspace");
+        throw new BadRequestError(
+          "This user is already a member of the workspace",
+        );
       }
     }
 
@@ -142,21 +144,21 @@ export class WorkspaceService {
     return { message: "Invite sent successfully" };
   }
 
-  async acceptInvite(inviteToken: string, currentUser: UserProps) {
+  async acceptInvite(inviteToken: string) {
     const payload = verifyInviteToken(inviteToken);
 
     if (!payload) {
       throw new BadRequestError("Invalid or expired invite link");
     }
 
-    if (payload.email.toLowerCase() !== currentUser.email.toLowerCase()) {
-      throw new BadRequestError("This invite was not sent to your email address");
-    }
+    const receiveResult = await this.userRepo
+      .findByEmail(payload.email)
+    const receiveUser = receiveResult!.get({ plain: true });
 
     // Prevent duplicate membership
     const alreadyMember = await this.workspaceRepo.checkUserInWorkspace(
       payload.workspaceId,
-      currentUser.id,
+      receiveUser.id,
     );
 
     if (alreadyMember) {
@@ -171,7 +173,7 @@ export class WorkspaceService {
 
     await this.workspaceRepo.addMember(
       payload.workspaceId,
-      currentUser.id,
+      receiveUser.id,
       WorkspaceRole.MEMBER,
       payload.invitedBy,
     );
@@ -212,7 +214,11 @@ export class WorkspaceService {
     return { message: "Deleted successfully" };
   }
 
-  async removeMember(workspaceId: number, targetUserId: number, user: UserProps) {
+  async removeMember(
+    workspaceId: number,
+    targetUserId: number,
+    user: UserProps,
+  ) {
     const workspace = await this.workspaceRepo.findOne(workspaceId);
 
     if (!workspace) {
@@ -224,7 +230,9 @@ export class WorkspaceService {
     }
 
     if (targetUserId === user.id) {
-      throw new BadRequestError("You cannot remove yourself from the workspace");
+      throw new BadRequestError(
+        "You cannot remove yourself from the workspace",
+      );
     }
 
     const isMember = await this.workspaceRepo.checkUserInWorkspace(
