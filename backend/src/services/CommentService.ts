@@ -47,7 +47,10 @@ export class CommentService {
   );
 
   const assigneeIds = task.assignees?.map((a: User) => a.id) ?? [];
-  const recipients = Array.from(new Set([...assigneeIds, user.id]));
+  const ownerId = (task as any)?.list?.category?.space?.workspace?.ownerId; // 👈 lấy owner
+  const recipients = Array.from(
+    new Set([...assigneeIds, user.id, ...(ownerId ? [ownerId] : [])]) // 👈 thêm owner
+  );
 
   const plain = comment!.get({ plain: true });
   const payload = {
@@ -80,7 +83,9 @@ export class CommentService {
 
   const updatedComment = await this.commentRepo.update(id, user.id, data);
   const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
-  const recipients = Array.from(new Set([...assigneeIds, user.id]));
+  const recipients = Array.from(
+    new Set([...assigneeIds, user.id, ...(ownerId ? [ownerId] : [])]) 
+  );
 
   if (recipients.length > 0) {
     this.socketService.emitCommentUpdated(recipients, updatedComment!.get({ plain: true }));
@@ -111,7 +116,9 @@ async delete(id: number, user: UserProps) {
   );
 
   const assigneeIds = (task as any)?.assignees?.map((a: any) => a.id) ?? [];
-  const recipients = Array.from(new Set([...assigneeIds, user.id]));
+  const recipients = Array.from(
+    new Set([...assigneeIds, user.id, ...(ownerId ? [ownerId] : [])]) 
+  );
   if (recipients.length > 0) {
     this.socketService.emitCommentDeleted(recipients, { id: commentId, taskId, deletedBy: user.id });
   }

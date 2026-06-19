@@ -75,7 +75,7 @@ export default function CreateWorkspaceModal({
   const [selectedColor, setSelectedColor] = useState(COLORS[0].hex);
   const [internalLoading, setInternalLoading] = useState(false);
 
-  const isLoading = externalLoading ?? internalLoading;
+  const isLoading = externalLoading || internalLoading;
 
   const {
     register,

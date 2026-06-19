@@ -66,12 +66,20 @@ export class TaskService {
   }
 
   async findAll(listId?: number, statusId?: number, spaceId?: number) {
-    const tasks: Task[] = await this.taskRepo.findAll(listId, statusId, spaceId);
+    const tasks: Task[] = await this.taskRepo.findAll(
+      listId,
+      statusId,
+      spaceId,
+    );
     return tasks.map((task) => task.get({ plain: true }));
   }
 
   async findByUser(user: UserProps, workspaceId?: number, statusId?: number) {
-    const tasks: Task[] = await this.taskRepo.findByUser(user.id, workspaceId, statusId);
+    const tasks: Task[] = await this.taskRepo.findByUser(
+      user.id,
+      workspaceId,
+      statusId,
+    );
     return tasks.map((task) => task.get({ plain: true }));
   }
 
@@ -119,13 +127,13 @@ export class TaskService {
     );
 
     const assigneeIds = data.assignees ?? [];
-    if (assigneeIds.length > 0) {
-      this.socketService.emitTaskCreated(assigneeIds, {
-        taskId: task.id,
-        name: task.name,
-        createdBy: user.id,
-      });
-    }
+    const recipientIds = Array.from(new Set([user.id, ...assigneeIds]));
+
+    this.socketService.emitTaskCreated(recipientIds, {
+      taskId: task.id,
+      name: task.name,
+      createdBy: user.id,
+    });
 
     return task;
   }

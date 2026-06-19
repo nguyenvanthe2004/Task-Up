@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Member } from "../../types/task";
+import { Member, Task } from "../../types/task";
 import { Status } from "../../types/status";
 import {
   PriorityStatus,
@@ -23,7 +23,7 @@ export const InlineDayCreate: React.FC<{
   members: Member[];
   statuses: Status[];
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (newTask: Task) => void;
 }> = ({ date, statusId, listId, members, statuses, onClose, onCreated }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
@@ -58,7 +58,7 @@ export const InlineDayCreate: React.FC<{
     if (submittingRef.current) return;
     submittingRef.current = true;
     try {
-      await callCreateTask({
+      const res = await callCreateTask({
         ...data,
         listId: Number(listId),
         statusId,
@@ -67,7 +67,8 @@ export const InlineDayCreate: React.FC<{
       } as any);
       toastSuccess("Task created!");
       reset();
-      onCreated();
+      const createdTask: Task = res.data;
+      onCreated(createdTask);
     } catch {
       toastError("Failed to create task.");
     } finally {

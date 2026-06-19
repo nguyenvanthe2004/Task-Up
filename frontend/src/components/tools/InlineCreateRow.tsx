@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Member } from "../../types/task";
+import { Member, Task } from "../../types/task";
 import ReactQuill from "react-quill-new";
 import { CreateTaskFormData, CreateTaskSchema } from "../../validations/task";
 import { Controller, useForm } from "react-hook-form";
@@ -22,7 +22,7 @@ interface InlineCreateRowProps {
   members: Member[];
   listId: string | undefined;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (newTask: Task) => void;
 }
 
 export const GRID_COLS = "1fr 120px 130px 95px 115px 115px 80px";
@@ -68,16 +68,16 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({
     if (submittingRef.current) return;
     submittingRef.current = true;
     try {
-      await callCreateTask({
+      const res = await callCreateTask({
         ...data,
         listId: Number(listId),
         statusId,
         startDate: toISO(data.startDate),
         dueDate: toISO(data.dueDate),
       } as any);
-      toastSuccess("Task created successfully!");
       reset();
-      onCreated();
+      const createdTask: Task = res.data;
+      onCreated(createdTask);
     } catch {
       toastError("Failed to create task.");
     } finally {

@@ -657,7 +657,14 @@ const ListView = forwardRef<ListViewHandle>((_, ref) => {
                           members={members}
                           listId={listId}
                           onClose={() => setOpenInlineStatusId(null)}
-                          onCreated={() => {
+                          onCreated={(newTask: Task) => {
+                            setGroups((prev) =>
+                              prev.map((g) =>
+                                g.status.id === newTask.statusId
+                                  ? { ...g, tasks: [...g.tasks, newTask] }
+                                  : g,
+                              ),
+                            );
                             setOpenInlineStatusId(null);
                           }}
                         />

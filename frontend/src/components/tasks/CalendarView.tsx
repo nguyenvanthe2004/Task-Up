@@ -671,7 +671,11 @@ const CalendarView = forwardRef<ListViewHandle>((_, ref) => {
                     members={members}
                     statuses={statuses}
                     onClose={() => setOpenCreateDate(null)}
-                    onCreated={() => {
+                    onCreated={(newTask: Task) => {
+                      setTasks((prev) => {
+                        if (prev.some((t) => t.id === newTask.id)) return prev;
+                        return [...prev, newTask];
+                      });
                       setOpenCreateDate(null);
                     }}
                   />
